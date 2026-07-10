@@ -8,6 +8,13 @@ export function currentMonthKst() {
   return todayKst().slice(0, 7);
 }
 
+export function currentWeekStartKst() {
+  const date = new Date(`${todayKst()}T00:00:00Z`);
+  const mondayOffset = (date.getUTCDay() + 6) % 7;
+  date.setUTCDate(date.getUTCDate() - mondayOffset);
+  return date.toISOString().slice(0, 10);
+}
+
 export function isValidDateString(s) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
   const d = new Date(`${s}T00:00:00Z`);

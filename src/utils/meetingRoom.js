@@ -3,9 +3,9 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { AttachmentBuilder, EmbedBuilder, ModalBuilder, PermissionFlagsBits, MessageFlags, TextInputBuilder, TextInputStyle, ActionRowBuilder } from 'discord.js';
 import { readJson, updateJson, withLock } from './jsonStore.js';
-import { renderMonthImage, ROOMS } from './statusImage.js';
-import { todayKst, currentMonthKst } from './dateKst.js';
-import { createAllDayEvent, deleteEvent } from './gcal.js';
+import { renderMonthImage, renderWeekImage, ROOMS } from './statusImage.js';
+import { todayKst, currentMonthKst, currentWeekStartKst } from './dateKst.js';
+import { createAllDayEvent, deleteEvent, eventExists } from './gcal.js';
 import { log } from './logger.js';
 import { sendDecisionNotice } from './applicationForum.js';
 import { serverDisplayName } from './discordNames.js';
@@ -199,11 +199,63 @@ async function updateReservationRequestMessage(client, reservation) {
   const message = await channel?.messages.fetch(reservation.requestMessageId).catch(() => null);
   if (!message?.embeds[0]) return;
   const approved = reservation.status === 'approved';
+  const actorName = reservation.decidedByName ?? reservation.cancelledByName ?? '구글 캘린더';
   const embed = EmbedBuilder.from(message.embeds[0])
-    .setColor(approved ? 0x3ba55d : 0xd83c3e)
-    .setFooter({ text: `${statusLabel(reservation.status)} · 처리: ${reservation.decidedByName}` });
+    .setColor(approved ? 0x3ba55d : reservation.status === 'cancelled' ? 0x99aab5 : 0xd83c3e)
+    .setFooter({ text: `${statusLabel(reservation.status)} · 처리: ${actorName}` });
   if (reservation.rejectionReason) embed.addFields({ name: '거절 사유', value: reservation.rejectionReason });
   await message.edit({ embeds: [embed], components: [] }).catch(() => {});
+}
+
+export async function syncDeletedCalendarEvents(guildId) {
+  const reservations = await getReservations(guildId);
+  const candidates = reservations.filter((reservation) => reservation.status === 'approved' && reservation.gcalEventId);
+  const missingIds = new Set();
+  for (const reservation of candidates) {
+    try {
+      if (!(await eventExists(reservation.gcalEventId))) missingIds.add(reservation.id);
+    } catch (err) {
+      log('error', '캘린더 일정 조회 실패:', err.message);
+    }
+  }
+  if (!missingIds.size) return [];
+
+  return updateReservations(guildId, (list) => {
+    const cancelled = [];
+    for (const reservation of list) {
+      if (!missingIds.has(reservation.id) || reservation.status !== 'approved') continue;
+      reservation.status = 'cancelled';
+      reservation.cancelledAt = new Date().toISOString();
+      reservation.cancelledByName = '구글 캘린더';
+      reservation.cancellationReason = '구글 캘린더 일정 삭제';
+      cancelled.push({ ...reservation });
+    }
+    return cancelled;
+  });
+}
+
+export async function syncAllCalendarEvents(client) {
+  const guildsDir = join(process.cwd(), 'database', 'guilds');
+  let guildIds = [];
+  try {
+    guildIds = await fs.readdir(guildsDir);
+  } catch {
+    return;
+  }
+  for (const guildId of guildIds) {
+    const cancelled = await syncDeletedCalendarEvents(guildId);
+    if (!cancelled.length) continue;
+    for (const reservation of cancelled) {
+      await updateReservationRequestMessage(client, reservation);
+      await sendDecisionNotice(
+        client,
+        reservation.discussionThreadId ?? reservation.requestChannelId,
+        `<@${reservation.userId}> 구글 캘린더 일정이 삭제되어 회의실 예약도 취소되었습니다.`,
+        reservation.userId,
+      );
+    }
+    await refreshStatusBoard(client, guildId);
+  }
 }
 
 export async function cancelReservation(guildId, { room, date, requesterId, isAdmin }) {
@@ -248,9 +300,11 @@ export function refreshStatusBoard(client, guildId) {
 
     const month = currentMonthKst();
     const [year, monthNum] = month.split('-').map(Number);
-    const reservations = (await getReservations(guildId)).filter((r) => r.date.startsWith(month));
-    const png = renderMonthImage(reservations, year, monthNum);
-    const file = new AttachmentBuilder(png, { name: 'meeting-rooms.png' });
+    const allReservations = await getReservations(guildId);
+    const reservations = allReservations.filter((r) => r.date.startsWith(month));
+    const weekStart = currentWeekStartKst();
+    const monthFile = new AttachmentBuilder(renderMonthImage(reservations, year, monthNum), { name: 'meeting-rooms-month.png' });
+    const weekFile = new AttachmentBuilder(renderWeekImage(allReservations, weekStart), { name: 'meeting-rooms-week.png' });
 
     let channel;
     try {
@@ -263,13 +317,13 @@ export function refreshStatusBoard(client, guildId) {
     if (messageId) {
       try {
         const message = await channel.messages.fetch(messageId);
-        await message.edit({ content: '', files: [file], attachments: [] });
+        await message.edit({ content: '', files: [monthFile, weekFile], attachments: [] });
       } catch {
         messageId = null;
       }
     }
     if (!messageId) {
-      const sent = await channel.send({ files: [file] });
+      const sent = await channel.send({ files: [monthFile, weekFile] });
       messageId = sent.id;
     }
 
@@ -278,6 +332,7 @@ export function refreshStatusBoard(client, guildId) {
       if (b && b.channelId === board.channelId) {
         b.messageId = messageId;
         b.lastRenderedMonth = month;
+        b.lastRenderedWeek = weekStart;
       }
     });
   });
@@ -304,10 +359,12 @@ export function startDailyRefresh(client) {
   let lastRenderedDay = todayKst();
   setInterval(async () => {
     const day = todayKst();
-    if (day === lastRenderedDay) return;
     try {
-      await refreshAllStatusBoards(client);
-      lastRenderedDay = day;
+      if (day !== lastRenderedDay) {
+        await refreshAllStatusBoards(client);
+        lastRenderedDay = day;
+      }
+      await syncAllCalendarEvents(client);
     } catch (err) {
       log('error', '일일 현황판 갱신 실패:', err.message);
     }

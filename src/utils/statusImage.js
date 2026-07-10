@@ -14,6 +14,25 @@ const HEADER_H = 64;
 const WEEKDAY_H = 34;
 const FOOTER_H = 14;
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+const WEEK_CELL_W = 210;
+const WEEK_CELL_H = 150;
+const WEEK_LABEL_W = 82;
+const WEEK_HEADER_H = 70;
+
+function participantsOf(entry) {
+  return Array.isArray(entry.participants) && entry.participants.length
+    ? entry.participants
+    : [{ studentId: '', name: entry.userName }];
+}
+
+function clippedText(ctx, text, maxWidth) {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  const chars = [...text];
+  while (chars.length > 3 && ctx.measureText(`${chars.join('')}…`).width > maxWidth) {
+    chars.pop();
+  }
+  return `${chars.join('')}…`;
+}
 
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
@@ -118,20 +137,99 @@ export function renderMonthImage(reservations, year, month) {
       ctx.fill();
       ctx.fillStyle = pending ? '#ffffff' : room?.text ?? '#ffffff';
       ctx.font = '14px NanumGothic';
-      const participants = Array.isArray(entry.participants) && entry.participants.length
-        ? entry.participants
-        : [{ studentId: '', name: entry.userName }];
+      const participants = participantsOf(entry);
       const names = participants.map((participant) => `${participant.studentId} ${participant.name}`.trim()).join(', ');
       let label = pending ? `${entry.room} 대기 ${participants.length}명` : `${entry.room} ${participants.length}명 ${names}`;
-      if (ctx.measureText(label).width > CELL_W - 24) {
-        const chars = [...label];
-        while (chars.length > 3 && ctx.measureText(`${chars.join('')}…`).width > CELL_W - 24) {
-          chars.pop();
-        }
-        label = `${chars.join('')}…`;
-      }
+      label = clippedText(ctx, label, CELL_W - 24);
       ctx.fillText(label, x + 12, pillY + 12);
       pillY += 27;
+    }
+  }
+
+  return canvas.toBuffer('image/png');
+}
+
+export function renderWeekImage(reservations, weekStart) {
+  const start = new Date(`${weekStart}T00:00:00Z`);
+  const dates = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(start);
+    date.setUTCDate(date.getUTCDate() + index);
+    return date.toISOString().slice(0, 10);
+  });
+  const width = MARGIN * 2 + WEEK_LABEL_W + WEEK_CELL_W * 7;
+  const height = WEEK_HEADER_H + WEEKDAY_H + WEEK_CELL_H * ROOMS.length + FOOTER_H;
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+  const today = todayKst();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = '#222222';
+  ctx.font = 'bold 30px NanumGothic';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`주간 회의실 현황 ${dates[0].slice(5).replace('-', '.')} ~ ${dates[6].slice(5).replace('-', '.')}`, MARGIN, WEEK_HEADER_H / 2 + 2);
+
+  const byRoomAndDate = new Map();
+  for (const reservation of reservations) {
+    if (reservation.status !== 'approved' && reservation.status !== 'pending') continue;
+    byRoomAndDate.set(`${reservation.room}:${reservation.date}`, reservation);
+  }
+
+  ctx.font = 'bold 17px NanumGothic';
+  ctx.textAlign = 'center';
+  for (let index = 0; index < dates.length; index++) {
+    const date = dates[index];
+    const x = MARGIN + WEEK_LABEL_W + index * WEEK_CELL_W;
+    const day = new Date(`${date}T00:00:00Z`).getUTCDay();
+    ctx.fillStyle = day === 0 ? '#d83c3e' : day === 6 ? '#3b6ad8' : '#555555';
+    ctx.fillText(`${WEEKDAYS[day]} ${date.slice(5).replace('-', '/')}`, x + WEEK_CELL_W / 2, WEEK_HEADER_H + WEEKDAY_H / 2);
+  }
+  ctx.textAlign = 'left';
+
+  for (let roomIndex = 0; roomIndex < ROOMS.length; roomIndex++) {
+    const room = ROOMS[roomIndex];
+    const y = WEEK_HEADER_H + WEEKDAY_H + roomIndex * WEEK_CELL_H;
+    ctx.fillStyle = room.color;
+    roundRect(ctx, MARGIN, y + 10, WEEK_LABEL_W - 12, 34, 7);
+    ctx.fill();
+    ctx.fillStyle = room.text;
+    ctx.font = 'bold 16px NanumGothic';
+    ctx.textAlign = 'center';
+    ctx.fillText(room.name, MARGIN + (WEEK_LABEL_W - 12) / 2, y + 27);
+    ctx.textAlign = 'left';
+
+    for (let dayIndex = 0; dayIndex < dates.length; dayIndex++) {
+      const date = dates[dayIndex];
+      const x = MARGIN + WEEK_LABEL_W + dayIndex * WEEK_CELL_W;
+      const entry = byRoomAndDate.get(`${room.name}:${date}`);
+      const isPast = date < today;
+      ctx.fillStyle = isPast ? '#f5f5f5' : '#ffffff';
+      ctx.fillRect(x, y, WEEK_CELL_W, WEEK_CELL_H);
+      ctx.strokeStyle = '#dddddd';
+      ctx.strokeRect(x + 0.5, y + 0.5, WEEK_CELL_W, WEEK_CELL_H);
+
+      if (!entry) {
+        ctx.fillStyle = isPast ? '#aaaaaa' : '#777777';
+        ctx.font = '14px NanumGothic';
+        ctx.fillText(isPast ? '지난 날짜' : '사용 가능', x + 12, y + 28);
+        continue;
+      }
+
+      const participants = participantsOf(entry);
+      const names = participants.map((participant) => `${participant.studentId} ${participant.name}`.trim()).join(', ');
+      const pending = entry.status === 'pending';
+      ctx.fillStyle = pending ? '#b5b5b5' : room.color;
+      roundRect(ctx, x + 8, y + 10, WEEK_CELL_W - 16, 32, 7);
+      ctx.fill();
+      ctx.fillStyle = pending ? '#ffffff' : room.text;
+      ctx.font = 'bold 15px NanumGothic';
+      ctx.fillText(pending ? `승인 대기 · ${participants.length}명` : `예약 완료 · ${participants.length}명`, x + 16, y + 26);
+      ctx.fillStyle = '#333333';
+      ctx.font = '13px NanumGothic';
+      ctx.fillText(clippedText(ctx, names, WEEK_CELL_W - 24), x + 12, y + 66);
+      ctx.font = '12px NanumGothic';
+      ctx.fillStyle = '#666666';
+      ctx.fillText(clippedText(ctx, entry.purpose ?? '', WEEK_CELL_W - 24), x + 12, y + 92);
     }
   }
 

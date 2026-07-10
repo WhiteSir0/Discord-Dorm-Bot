@@ -82,6 +82,19 @@ export async function deleteEvent(eventId) {
   }
 }
 
+export async function eventExists(eventId) {
+  if (!gcalEnabled() || !eventId) return true;
+  const token = await getAccessToken();
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (res.status === 404 || res.status === 410) return false;
+  if (!res.ok) throw new Error(`캘린더 일정 조회 실패: ${res.status} ${await res.text()}`);
+  const event = await res.json();
+  return event.status !== 'cancelled';
+}
+
 export function logCalendarState() {
   if (gcalEnabled()) log('info', '📆 구글 캘린더 연동 활성화됨');
   else log('info', '📆 구글 캘린더 미설정 — 예약은 봇 내부에만 기록됩니다');

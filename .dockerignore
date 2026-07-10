@@ -4,6 +4,7 @@ npm-debug.log
 .env.example
 database
 logs
+secrets
 .git
 .gitignore
 Dockerfile

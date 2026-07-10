@@ -11,3 +11,4 @@ services:
     volumes:
       - ./database:/app/database
       - ./logs:/app/logs
+      - ./secrets:/app/secrets:ro

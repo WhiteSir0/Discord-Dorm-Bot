@@ -1,9 +1,19 @@
 import { Events, MessageFlags } from 'discord.js';
 import { log } from '../utils/logger.js';
+import { handleReservationButton } from '../utils/meetingRoom.js';
 
 export default {
   name: Events.InteractionCreate,
   async execute(interaction) {
+    if (interaction.isButton() && interaction.customId.startsWith('mr:')) {
+      try {
+        await handleReservationButton(interaction);
+      } catch (err) {
+        log('error', '회의실 버튼 처리 오류:', err);
+      }
+      return;
+    }
+
     if (!interaction.isChatInputCommand()) return;
 
     const command = interaction.client.commands.get(interaction.commandName);

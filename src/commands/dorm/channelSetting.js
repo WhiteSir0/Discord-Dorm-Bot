@@ -13,7 +13,12 @@ export default {
         .setName('타입')
         .setDescription('채널 용도')
         .setRequired(true)
-        .addChoices({ name: '회의실', value: '회의실' }),
+        .addChoices(
+          { name: '회의실 현황', value: '회의실' },
+          { name: '회의실 신청 채널', value: '회의실신청' },
+          { name: '연장 신청 채널', value: '연장신청' },
+          { name: '학습 영상 신청 포럼', value: '학습영상신청' },
+        ),
     ),
 
   async execute(interaction) {
@@ -30,25 +35,26 @@ export default {
     });
 
     if (previous.unchanged) {
-      await interaction.reply({ content: `이미 이 채널이 **${type}** 채널이에요. 현황판을 새로 고칠게요.`, flags: MessageFlags.Ephemeral });
+      await interaction.reply({ content: `이미 이 채널이 **${type}** 채널이에요.`, flags: MessageFlags.Ephemeral });
     } else {
-      await interaction.reply({ content: `이 채널이 **${type}** 채널로 지정됐어요. 예약 현황판을 게시할게요.`, flags: MessageFlags.Ephemeral });
+      await interaction.reply({ content: `이 채널이 **${type}** 채널로 지정됐어요.`, flags: MessageFlags.Ephemeral });
       const old = previous.prev;
-      if (old?.channelId && old.messageId) {
+      if (type === '회의실' && old?.channelId && old.messageId) {
         try {
           const channel = await interaction.client.channels.fetch(old.channelId);
           const message = await channel.messages.fetch(old.messageId);
           await message.delete();
         } catch {
-          // 이전 현황판이 이미 지워졌으면 무시
         }
       }
     }
 
-    try {
-      await refreshStatusBoard(interaction.client, interaction.guildId);
-    } catch (err) {
-      log('error', '현황판 갱신 실패:', err.message);
+    if (type === '회의실') {
+      try {
+        await refreshStatusBoard(interaction.client, interaction.guildId);
+      } catch (err) {
+        log('error', '현황판 갱신 실패:', err.message);
+      }
     }
   },
 };

@@ -12,7 +12,7 @@ const CELL_H = 118;
 const MARGIN = 16;
 const HEADER_H = 64;
 const WEEKDAY_H = 34;
-const FOOTER_H = 34;
+const FOOTER_H = 14;
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
 function roundRect(ctx, x, y, w, h, r) {
@@ -118,7 +118,11 @@ export function renderMonthImage(reservations, year, month) {
       ctx.fill();
       ctx.fillStyle = pending ? '#ffffff' : room?.text ?? '#ffffff';
       ctx.font = '14px NanumGothic';
-      let label = pending ? `${entry.room} 대기` : `${entry.room} ${entry.userName}`;
+      const participants = Array.isArray(entry.participants) && entry.participants.length
+        ? entry.participants
+        : [{ studentId: '', name: entry.userName }];
+      const names = participants.map((participant) => `${participant.studentId} ${participant.name}`.trim()).join(', ');
+      let label = pending ? `${entry.room} 대기 ${participants.length}명` : `${entry.room} ${participants.length}명 ${names}`;
       if (ctx.measureText(label).width > CELL_W - 24) {
         const chars = [...label];
         while (chars.length > 3 && ctx.measureText(`${chars.join('')}…`).width > CELL_W - 24) {
@@ -130,10 +134,6 @@ export function renderMonthImage(reservations, year, month) {
       pillY += 27;
     }
   }
-
-  ctx.fillStyle = '#888888';
-  ctx.font = '14px NanumGothic';
-  ctx.fillText('신청: /회의실신청 · 취소: /회의실취소 · 회색은 승인 대기', MARGIN, height - FOOTER_H / 2);
 
   return canvas.toBuffer('image/png');
 }

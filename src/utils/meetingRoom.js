@@ -243,18 +243,22 @@ export async function syncAllCalendarEvents(client) {
     return;
   }
   for (const guildId of guildIds) {
-    const cancelled = await syncDeletedCalendarEvents(guildId);
-    if (!cancelled.length) continue;
-    for (const reservation of cancelled) {
-      await updateReservationRequestMessage(client, reservation);
-      await sendDecisionNotice(
-        client,
-        reservation.discussionThreadId ?? reservation.requestChannelId,
-        `<@${reservation.userId}> 구글 캘린더 일정이 삭제되어 회의실 예약도 취소되었습니다.`,
-        reservation.userId,
-      );
+    try {
+      const cancelled = await syncDeletedCalendarEvents(guildId);
+      if (!cancelled.length) continue;
+      for (const reservation of cancelled) {
+        await updateReservationRequestMessage(client, reservation);
+        await sendDecisionNotice(
+          client,
+          reservation.discussionThreadId ?? reservation.requestChannelId,
+          `<@${reservation.userId}> 구글 캘린더 일정이 삭제되어 회의실 예약도 취소되었습니다.`,
+          reservation.userId,
+        );
+      }
+      await refreshStatusBoard(client, guildId);
+    } catch (err) {
+      log('error', `캘린더 동기화 실패 (${guildId}):`, err.message);
     }
-    await refreshStatusBoard(client, guildId);
   }
 }
 

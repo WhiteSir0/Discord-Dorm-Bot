@@ -10,9 +10,12 @@ export function currentMonthKst() {
 
 export function currentWeekStartKst() {
   const date = new Date(`${todayKst()}T00:00:00Z`);
-  const mondayOffset = (date.getUTCDay() + 6) % 7;
-  date.setUTCDate(date.getUTCDate() - mondayOffset);
+  date.setUTCDate(date.getUTCDate() - date.getUTCDay());
   return date.toISOString().slice(0, 10);
+}
+
+export function dayOfWeek(dateStr) {
+  return new Date(`${dateStr}T00:00:00Z`).getUTCDay();
 }
 
 export function isValidDateString(s) {

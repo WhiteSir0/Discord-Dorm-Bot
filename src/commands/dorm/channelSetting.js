@@ -39,12 +39,14 @@ export default {
     } else {
       await interaction.reply({ content: `이 채널이 **${type}** 채널로 지정됐어요.`, flags: MessageFlags.Ephemeral });
       const old = previous.prev;
-      if (type === '회의실' && old?.channelId && old.messageId) {
-        try {
-          const channel = await interaction.client.channels.fetch(old.channelId);
-          const message = await channel.messages.fetch(old.messageId);
-          await message.delete();
-        } catch {
+      if (type === '회의실' && old?.channelId) {
+        for (const oldMessageId of [old.messageId, old.monthMessageId, old.weekMessageId].filter(Boolean)) {
+          try {
+            const channel = await interaction.client.channels.fetch(old.channelId);
+            const message = await channel.messages.fetch(oldMessageId);
+            await message.delete();
+          } catch {
+          }
         }
       }
     }

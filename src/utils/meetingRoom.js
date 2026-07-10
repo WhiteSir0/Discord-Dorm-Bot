@@ -305,10 +305,8 @@ export function refreshStatusBoard(client, guildId) {
     const month = currentMonthKst();
     const [year, monthNum] = month.split('-').map(Number);
     const allReservations = await getReservations(guildId);
-    const reservations = allReservations.filter((r) => r.date.startsWith(month));
+    const monthReservations = allReservations.filter((r) => r.date.startsWith(month));
     const weekStart = currentWeekStartKst();
-    const monthFile = new AttachmentBuilder(renderMonthImage(reservations, year, monthNum), { name: 'meeting-rooms-month.png' });
-    const weekFile = new AttachmentBuilder(renderWeekImage(allReservations, weekStart), { name: 'meeting-rooms-week.png' });
 
     let channel;
     try {
@@ -317,29 +315,51 @@ export function refreshStatusBoard(client, guildId) {
       return;
     }
 
-    let messageId = board.messageId ?? null;
-    if (messageId) {
+    // 예전 통합 메시지(이미지 2장짜리)는 한 번 지우고 분리 메시지로 전환
+    if (board.messageId) {
       try {
-        const message = await channel.messages.fetch(messageId);
-        await message.edit({ content: '', files: [monthFile, weekFile], attachments: [] });
+        const legacy = await channel.messages.fetch(board.messageId);
+        await legacy.delete();
       } catch {
-        messageId = null;
       }
     }
-    if (!messageId) {
-      const sent = await channel.send({ files: [monthFile, weekFile] });
-      messageId = sent.id;
-    }
+
+    const monthFile = new AttachmentBuilder(renderMonthImage(monthReservations, year, monthNum), { name: 'meeting-rooms-month.png' });
+    const weekFile = new AttachmentBuilder(renderWeekImage(allReservations, weekStart), { name: 'meeting-rooms-week.png' });
+
+    const monthMessageId = await upsertBoardMessage(channel, board.monthMessageId, monthFile);
+    const weekMessageId = await upsertBoardMessage(channel, board.weekMessageId, weekFile);
 
     await updateSettings(guildId, (s) => {
       const b = s.channels?.['회의실'];
       if (b && b.channelId === board.channelId) {
-        b.messageId = messageId;
+        delete b.messageId;
+        if (monthMessageId) b.monthMessageId = monthMessageId;
+        if (weekMessageId) b.weekMessageId = weekMessageId;
         b.lastRenderedMonth = month;
         b.lastRenderedWeek = weekStart;
       }
     });
   });
+}
+
+async function upsertBoardMessage(channel, messageId, file) {
+  if (messageId) {
+    try {
+      const message = await channel.messages.fetch(messageId);
+      await message.edit({ content: '', files: [file], attachments: [] });
+      return messageId;
+    } catch {
+      // 메시지가 지워졌으면 아래에서 새로 게시
+    }
+  }
+  try {
+    const sent = await channel.send({ files: [file] });
+    return sent.id;
+  } catch (err) {
+    log('error', '현황판 메시지 게시 실패:', err.message);
+    return null;
+  }
 }
 
 export async function refreshAllStatusBoards(client) {

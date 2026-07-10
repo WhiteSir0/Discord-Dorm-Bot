@@ -210,20 +210,20 @@ async function updateReservationRequestMessage(client, reservation) {
 export async function syncDeletedCalendarEvents(guildId) {
   const reservations = await getReservations(guildId);
   const candidates = reservations.filter((reservation) => reservation.status === 'approved' && reservation.gcalEventId);
-  const missingIds = new Set();
+  const missingEvents = new Map();
   for (const reservation of candidates) {
     try {
-      if (!(await eventExists(reservation.gcalEventId))) missingIds.add(reservation.id);
+      if (!(await eventExists(reservation.gcalEventId))) missingEvents.set(reservation.id, reservation.gcalEventId);
     } catch (err) {
       log('error', '캘린더 일정 조회 실패:', err.message);
     }
   }
-  if (!missingIds.size) return [];
+  if (!missingEvents.size) return [];
 
   return updateReservations(guildId, (list) => {
     const cancelled = [];
     for (const reservation of list) {
-      if (!missingIds.has(reservation.id) || reservation.status !== 'approved') continue;
+      if (reservation.status !== 'approved' || reservation.gcalEventId !== missingEvents.get(reservation.id)) continue;
       reservation.status = 'cancelled';
       reservation.cancelledAt = new Date().toISOString();
       reservation.cancelledByName = '구글 캘린더';

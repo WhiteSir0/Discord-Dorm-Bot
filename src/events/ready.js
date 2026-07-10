@@ -9,7 +9,11 @@ export default {
   async execute(client) {
     log('info', `✅ 로그인 완료: ${client.user.tag}`);
     logCalendarState();
-    await syncAllCalendarEvents(client);
+    try {
+      await syncAllCalendarEvents(client);
+    } catch (err) {
+      log('error', '캘린더 동기화 실패:', err.message);
+    }
     await refreshAllStatusBoards(client);
     startDailyRefresh(client);
   },

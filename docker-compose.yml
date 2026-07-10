@@ -1,0 +1,13 @@
+name: discord-dorm-bot
+
+services:
+  discord-dorm-bot:
+    build: .
+    image: discord-dorm-bot:latest
+    container_name: discord-dorm-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./database:/app/database
+      - ./logs:/app/logs

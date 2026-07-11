@@ -35,10 +35,18 @@ const TRACKS = [
   'Science - Kasane Teto',
   'Magic Maid - Kasane Teto',
   'Ghost Experience - 32ki feat. Kasane Teto',
-  'You Are a Worthless Child - Kasane Teto cover',
-  'Rolling Girl - wowaka / Kasane Teto cover',
-  'Lost One’s Weeping - Neru / Kasane Teto cover',
-  'Rabbit Hole - DECO*27 / Kasane Teto cover',
+  'CandyCookieChocolate - HALLO CEL feat. Hatsune Miku & Kasane Teto',
+  'Medicine - Sasuke Haraguchi feat. Kasane Teto',
+  'Mimukauwa Nice Try - Nunununununununu feat. Kasane Teto',
+  'Noda - Daibakuhashin feat. Hatsune Miku, Kasane Teto & Zundamon',
+  'Odochina - Atena feat. Hatsune Miku & Kasane Teto',
+  'Language of the Lost - RIProducer feat. Kasane Teto',
+  'Pathological Facade - GHOST feat. Kasane Teto',
+  'Spoken For - FLAVOR FOLEY feat. Kasane Teto',
+  'Responsible Society - Masarada feat. Kasane Teto',
+  'Honestly - Kasane Teto',
+  'MINIMUM RAGE - Kasane Teto',
+  'Melt Ice Cream - Kasane Teto',
 ];
 
 export function startBotPresence(client) {

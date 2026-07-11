@@ -172,6 +172,9 @@ async function finishReservationDecision(interaction, decision) {
   await refreshStatusBoard(interaction.client, interaction.guildId).catch((err) => log('error', '현황판 갱신 실패:', err.message));
 }
 
+// 구글 캘린더 색상: 2층 토마토(빨강), 3층 탠저린(브라운), 4층 바질(초록)
+const ROOM_CALENDAR_COLORS = { '2층': '11', '3층': '6', '4층': '10' };
+
 async function createReservationCalendarEvent(guildId, reservation) {
   let eventId = null;
   try {
@@ -179,6 +182,7 @@ async function createReservationCalendarEvent(guildId, reservation) {
       date: reservation.date,
       summary: `[${reservation.room}] ${reservation.purpose}`,
       description: `신청자: ${reservation.userName}\n회의 인원: ${participantsOf(reservation).length}\n명단: ${participantList(reservation, 4000)}\n\n${reservation.purpose}`,
+      colorId: ROOM_CALENDAR_COLORS[reservation.room],
     });
   } catch (err) {
     log('error', '캘린더 등록 실패 (예약은 승인됨):', err.message);

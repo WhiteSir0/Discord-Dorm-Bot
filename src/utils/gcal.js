@@ -49,7 +49,7 @@ async function getAccessToken() {
   return tokenCache.token;
 }
 
-export async function createAllDayEvent({ date, summary, description }) {
+export async function createAllDayEvent({ date, summary, description, colorId }) {
   if (!gcalEnabled()) return null;
   const token = await getAccessToken();
   const res = await fetch(
@@ -62,6 +62,7 @@ export async function createAllDayEvent({ date, summary, description }) {
         description,
         start: { date },
         end: { date: nextDay(date) },
+        ...(colorId ? { colorId } : {}),
       }),
     },
   );

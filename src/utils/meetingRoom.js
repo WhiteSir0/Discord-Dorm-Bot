@@ -10,7 +10,7 @@ import { log } from './logger.js';
 import { sendDecisionNotice } from './applicationForum.js';
 import { serverDisplayName } from './discordNames.js';
 import { roomStatusButtons } from './roomStatusButtons.js';
-import { addPrivateThreadMember, privateThreadLinkRow } from './privateApplicationThread.js';
+import { addPrivateThreadMember, findPrivateThreadRequestMessage, privateThreadLinkRow } from './privateApplicationThread.js';
 
 export const ROOM_NAMES = ROOMS.map((r) => r.name);
 
@@ -98,7 +98,7 @@ export function requestEmbed(reservation) {
     .addFields(
       { name: '회의실', value: reservation.room, inline: true },
       { name: '날짜', value: reservation.date, inline: true },
-      { name: '신청자', value: `<@${reservation.userId}> · ${reservation.requesterDisplayName ?? reservation.userName}`, inline: true },
+      { name: '신청자', value: `<@${reservation.userId}>`, inline: true },
       { name: `회의 인원 (${participants.length}명)`, value: participantList(reservation) },
       { name: '목적', value: reservation.purpose },
     )
@@ -180,8 +180,8 @@ async function finishReservationDecision(interaction, decision) {
   await addPrivateThreadMember(interaction.client, reservation.discussionThreadId, interaction.user.id);
   await updateReservationRequestMessage(interaction.client, reservation);
   const notice = reservation.status === 'approved'
-    ? `<@${reservation.userId}> 회의실 사용 신청이 승인되었습니다.\n처리: **${reservation.decidedByName}**`
-    : `<@${reservation.userId}> 회의실 사용 신청이 거절되었습니다.\n사유: ${reservation.rejectionReason}\n처리: **${reservation.decidedByName}**`;
+    ? `<@${reservation.userId}> 회의실 사용 신청이 승인되었습니다.\n처리: <@${reservation.decidedBy}>`
+    : `<@${reservation.userId}> 회의실 사용 신청이 거절되었습니다.\n사유: ${reservation.rejectionReason}\n처리: <@${reservation.decidedBy}>`;
   await sendDecisionNotice(interaction.client, reservation.discussionThreadId ?? reservation.requestChannelId, notice, reservation.userId);
   await refreshStatusBoard(interaction.client, interaction.guildId).catch((err) => log('error', '현황판 갱신 실패:', err.message));
 }
@@ -233,6 +233,14 @@ async function updateReservationRequestMessage(client, reservation) {
   if (reservation.rejectionReason) embed.addFields({ name: '거절 사유', value: reservation.rejectionReason });
   const components = reservation.discussionThreadId ? [privateThreadLinkRow(message.guildId, reservation.discussionThreadId)] : [];
   await message.edit({ embeds: [embed], components }).catch(() => {});
+  const threadMessage = await findPrivateThreadRequestMessage(client, reservation.discussionThreadId, reservation.id);
+  if (threadMessage?.embeds[0]) {
+    const threadEmbed = EmbedBuilder.from(threadMessage.embeds[0])
+      .setColor(approved ? 0x3ba55d : reservation.status === 'cancelled' ? 0x99aab5 : 0xd83c3e)
+      .setFooter({ text: `${statusLabel(reservation.status)} · 처리: ${actorName}` });
+    if (reservation.rejectionReason) threadEmbed.addFields({ name: '거절 사유', value: reservation.rejectionReason });
+    await threadMessage.edit({ embeds: [threadEmbed] }).catch(() => {});
+  }
 }
 
 export async function syncDeletedCalendarEvents(guildId) {

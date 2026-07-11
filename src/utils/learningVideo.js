@@ -3,7 +3,7 @@ import { ActionRowBuilder, EmbedBuilder, MessageFlags, ModalBuilder, PermissionF
 import { readJson, updateJson } from './jsonStore.js';
 import { sendDecisionNotice } from './applicationForum.js';
 import { serverDisplayName } from './discordNames.js';
-import { addPrivateThreadMember, privateThreadLinkRow } from './privateApplicationThread.js';
+import { addPrivateThreadMember, findPrivateThreadRequestMessage, privateThreadLinkRow } from './privateApplicationThread.js';
 
 const requestsPath = (guildId) => `guilds/${guildId}/learning-videos.json`;
 
@@ -23,17 +23,25 @@ export function attachVideoRequestMessage(guildId, id, channelId, messageId, dis
 }
 
 export function videoRequestEmbed(request) {
-  return new EmbedBuilder()
+  const reference = request.reference ?? request.url;
+  let link = null;
+  try {
+    const parsed = new URL(reference);
+    if (['http:', 'https:'].includes(parsed.protocol)) link = parsed.href;
+  } catch {
+  }
+  const embed = new EmbedBuilder()
     .setTitle('학습 영상 신청')
-    .setURL(request.url)
     .setColor(0xf0b232)
     .addFields(
-      { name: '신청자', value: `<@${request.userId}> · ${request.requesterDisplayName ?? request.userName}`, inline: true },
+      { name: '신청자', value: `<@${request.userId}>`, inline: true },
       { name: '학습 시간', value: request.duration, inline: true },
       { name: '학습 목적', value: request.purpose },
-      { name: '영상 링크', value: `[영상 열기](${request.url})` },
+      { name: '링크 또는 설명', value: link ? `[링크 열기](${link})` : reference },
     )
     .setFooter({ text: `승인 대기 중 · ${request.id}` });
+  if (link) embed.setURL(link);
+  return embed;
 }
 
 export async function handleVideoRequestButton(interaction) {
@@ -102,8 +110,8 @@ async function finishVideoDecision(interaction, decision) {
   await addPrivateThreadMember(interaction.client, request.discussionThreadId, interaction.user.id);
   await updateVideoRequestMessage(interaction.client, request);
   const notice = request.status === 'approved'
-    ? `<@${request.userId}> 확인했습니다. 관리실에서 머리띠 받아가세요.\n처리: **${request.decidedByName}**`
-    : `<@${request.userId}> 학습 영상 신청이 거절되었습니다.\n사유: ${request.rejectionReason}\n처리: **${request.decidedByName}**`;
+    ? `<@${request.userId}> 확인했습니다. 관리실에서 머리띠 받아가세요.\n처리: <@${request.decidedBy}>`
+    : `<@${request.userId}> 학습 영상 신청이 거절되었습니다.\n사유: ${request.rejectionReason}\n처리: <@${request.decidedBy}>`;
   await sendDecisionNotice(interaction.client, request.discussionThreadId ?? request.requestChannelId, notice, request.userId);
 }
 
@@ -119,6 +127,14 @@ async function updateVideoRequestMessage(client, request) {
   if (request.rejectionReason) embed.addFields({ name: '거절 사유', value: request.rejectionReason });
   const components = request.discussionThreadId ? [privateThreadLinkRow(message.guildId, request.discussionThreadId)] : [];
   await message.edit({ embeds: [embed], components }).catch(() => {});
+  const threadMessage = await findPrivateThreadRequestMessage(client, request.discussionThreadId, request.id);
+  if (threadMessage?.embeds[0]) {
+    const threadEmbed = EmbedBuilder.from(threadMessage.embeds[0])
+      .setColor(approved ? 0x3ba55d : 0xd83c3e)
+      .setFooter({ text: `${approved ? '승인됨' : '거절됨'} · 처리: ${request.decidedByName}` });
+    if (request.rejectionReason) threadEmbed.addFields({ name: '거절 사유', value: request.rejectionReason });
+    await threadMessage.edit({ embeds: [threadEmbed] }).catch(() => {});
+  }
 }
 
 export async function getVideoRequests(guildId) {

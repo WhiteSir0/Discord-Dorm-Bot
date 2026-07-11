@@ -7,7 +7,7 @@ import {
   SlashCommandBuilder,
   UserSelectMenuBuilder,
 } from 'discord.js';
-import { attachRequestMessage, createReservation, isRoomOccupied, refreshStatusBoard, requestEmbed, ROOM_NAMES } from '../../utils/meetingRoom.js';
+import { attachRequestMessage, createReservation, getSettings, isRoomOccupied, refreshStatusBoard, requestEmbed, ROOM_NAMES } from '../../utils/meetingRoom.js';
 import { createDraft, setDraftParticipants, takeDraft } from '../../utils/interactionDrafts.js';
 import { formatUser, getUserInfo, resolveRegisteredUsers } from '../../utils/userRegistry.js';
 import { dayOfWeek, isValidDateString, normalizeDateInput, todayKst } from '../../utils/dateKst.js';
@@ -26,6 +26,16 @@ export default {
     .addStringOption((opt) => opt.setName('목적').setDescription('사용 목적').setRequired(true).setMaxLength(80)),
 
   async execute(interaction) {
+    const settings = await getSettings(interaction.guildId);
+    const channelId = settings.channels?.['회의실신청']?.channelId;
+    if (!channelId) {
+      await interaction.reply({ content: '회의실 신청 채널이 설정되지 않았어요.', flags: MessageFlags.Ephemeral });
+      return;
+    }
+    if (interaction.channelId !== channelId) {
+      await interaction.reply({ content: `이 명령어는 <#${channelId}>에서만 사용할 수 있어요.`, flags: MessageFlags.Ephemeral });
+      return;
+    }
     const room = interaction.options.getString('회의실');
     const date = normalizeDateInput(interaction.options.getString('날짜'));
     const purpose = interaction.options.getString('목적');

@@ -11,7 +11,8 @@ export function privateThreadLinkRow(guildId, threadId) {
 
 export async function createPrivateApplicationThread(channel, guildId, payload) {
   if (!channel || channel.type !== ChannelType.GuildText) return null;
-  const message = await channel.send({ embeds: payload.embeds, components: payload.components });
+  const message = payload.parentMessage
+    ?? await channel.send({ embeds: payload.embeds, components: payload.components });
   const thread = await channel.threads.create({
     name: payload.name.slice(0, 100),
     type: ChannelType.PrivateThread,
@@ -32,4 +33,16 @@ export async function addPrivateThreadMember(client, threadId, userId) {
   if (!threadId) return;
   const thread = await client.channels.fetch(threadId).catch(() => null);
   await thread?.members?.add(userId).catch(() => {});
+}
+
+export async function findPrivateThreadRequestMessage(client, threadId, requestId) {
+  if (!threadId) return null;
+  const thread = await client.channels.fetch(threadId).catch(() => null);
+  if (!thread?.isThread()) return null;
+  if (thread.archived) await thread.setArchived(false).catch(() => {});
+  const messages = await thread.messages.fetch({ limit: 100 }).catch(() => null);
+  return messages?.find((message) =>
+    message.author.id === client.user.id
+    && message.embeds.some((embed) => embed.footer?.text?.includes(requestId)))
+    ?? null;
 }

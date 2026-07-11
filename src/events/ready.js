@@ -14,7 +14,7 @@ export default {
     } catch (err) {
       log('error', '캘린더 동기화 실패:', err.message);
     }
-    await refreshAllStatusBoards(client);
+    await refreshAllStatusBoards(client, { skipUnchanged: true });
     startDailyRefresh(client);
   },
 };

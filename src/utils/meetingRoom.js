@@ -324,7 +324,7 @@ export async function closeRequestMessage(client, reservation, footerText) {
   }
 }
 
-export function refreshStatusBoard(client, guildId) {
+export function refreshStatusBoard(client, guildId, { skipUnchanged = false } = {}) {
   return withLock(`board:${guildId}`, async () => {
     const settings = await getSettings(guildId);
     const board = settings.channels?.['회의실'];
@@ -343,26 +343,48 @@ export function refreshStatusBoard(client, guildId) {
       return;
     }
 
-    const oldMessageIds = [...new Set([board.messageId, board.monthMessageId, board.weekMessageId].filter(Boolean))];
-    for (const oldMessageId of oldMessageIds) {
-      try {
-        const oldMessage = await channel.messages.fetch(oldMessageId);
-        await oldMessage.delete();
-      } catch {
-      }
+    let monthMessage = board.monthMessageId
+      ? await channel.messages.fetch(board.monthMessageId).catch(() => null)
+      : null;
+    let weekMessage = board.weekMessageId
+      ? await channel.messages.fetch(board.weekMessageId).catch(() => null)
+      : null;
+    if (
+      skipUnchanged
+      && board.lastRenderedMonth === month
+      && board.lastRenderedWeek === weekStart
+      && monthMessage
+      && weekMessage
+    ) {
+      return;
     }
 
     const monthFile = new AttachmentBuilder(renderMonthImage(monthReservations, year, monthNum), { name: 'meeting-rooms-month.png' });
     const weekFile = new AttachmentBuilder(renderWeekImage(allReservations, weekStart), { name: 'meeting-rooms-week.png' });
-    let monthMessage;
-    let weekMessage;
+    let createdMonthMessage = false;
+    let createdWeekMessage = false;
     try {
-      monthMessage = await channel.send({ files: [monthFile] });
-      weekMessage = await channel.send({ files: [weekFile], components: [roomStatusButtons(weekStart)] });
+      if (monthMessage) {
+        await monthMessage.edit({ attachments: [], files: [monthFile], components: [] });
+      } else {
+        monthMessage = await channel.send({ files: [monthFile] });
+        createdMonthMessage = true;
+      }
+      if (weekMessage) {
+        await weekMessage.edit({ attachments: [], files: [weekFile], components: [roomStatusButtons(weekStart)] });
+      } else {
+        weekMessage = await channel.send({ files: [weekFile], components: [roomStatusButtons(weekStart)] });
+        createdWeekMessage = true;
+      }
     } catch (err) {
-      await monthMessage?.delete().catch(() => {});
-      await weekMessage?.delete().catch(() => {});
+      if (createdMonthMessage) await monthMessage?.delete().catch(() => {});
+      if (createdWeekMessage) await weekMessage?.delete().catch(() => {});
       throw err;
+    }
+
+    if (board.messageId && board.messageId !== monthMessage.id && board.messageId !== weekMessage.id) {
+      const legacyMessage = await channel.messages.fetch(board.messageId).catch(() => null);
+      await legacyMessage?.delete().catch(() => {});
     }
 
     await updateSettings(guildId, (s) => {
@@ -378,7 +400,7 @@ export function refreshStatusBoard(client, guildId) {
   });
 }
 
-export async function refreshAllStatusBoards(client) {
+export async function refreshAllStatusBoards(client, options) {
   const guildsDir = join(process.cwd(), 'database', 'guilds');
   let guildIds = [];
   try {
@@ -388,7 +410,7 @@ export async function refreshAllStatusBoards(client) {
   }
   for (const guildId of guildIds) {
     try {
-      await refreshStatusBoard(client, guildId);
+      await refreshStatusBoard(client, guildId, options);
     } catch (err) {
       log('error', `현황판 갱신 실패 (${guildId}):`, err.message);
     }

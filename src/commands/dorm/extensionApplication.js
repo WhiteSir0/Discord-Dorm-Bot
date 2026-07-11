@@ -1,4 +1,4 @@
-import { AttachmentBuilder, ChannelType, InteractionContextType, MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
+import { AttachmentBuilder, InteractionContextType, MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { getSettings } from '../../utils/meetingRoom.js';
 import { extensionButtons, extensionControlButtons, extensionEmbed, extensionResultCsv, getLatestExtensionApplication, setExtensionMessage, startExtensionApplication } from '../../utils/extensionApplication.js';
 
@@ -33,6 +33,17 @@ export default {
       return;
     }
 
+    const settings = await getSettings(interaction.guildId);
+    const channelId = settings.channels?.['연장신청']?.channelId;
+    if (!channelId) {
+      await interaction.reply({ content: '연장 신청 채널이 설정되지 않았어요.', flags: MessageFlags.Ephemeral });
+      return;
+    }
+    if (interaction.channelId !== channelId) {
+      await interaction.reply({ content: `이 명령어는 <#${channelId}>에서만 사용할 수 있어요.`, flags: MessageFlags.Ephemeral });
+      return;
+    }
+
     const result = await startExtensionApplication(interaction.guildId);
     if (result.existing) {
       const location = result.application.channelId ? `<#${result.application.channelId}>` : '현재 채널';
@@ -52,15 +63,6 @@ export default {
       embeds: [extensionEmbed(result.application)],
       components: [extensionButtons(result.application), extensionControlButtons(result.application)],
     };
-    const settings = await getSettings(interaction.guildId);
-    const configuredChannel = await interaction.client.channels.fetch(settings.channels?.['연장신청']?.channelId).catch(() => null);
-    if (configuredChannel?.type === ChannelType.GuildText) {
-      const message = await configuredChannel.send(payload);
-      await setExtensionMessage(interaction.guildId, result.application.id, message.channelId, message.id);
-      await interaction.reply({ content: `${result.application.label} 연장 신청을 <#${message.channelId}>에 시작했습니다.`, flags: MessageFlags.Ephemeral });
-      return;
-    }
-
     await interaction.reply(payload);
     const message = await interaction.fetchReply();
     await setExtensionMessage(interaction.guildId, result.application.id, message.channelId, message.id);

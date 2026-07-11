@@ -21,10 +21,28 @@ const TRACKS = [
   'Ochame Kinou - LamazeP feat. Kasane Teto',
   'Triple Baka - LamazeP feat. Hatsune Miku, Kasane Teto & Akita Neru',
   'Yoshiwara Lament - Asa feat. Kasane Teto',
+  'Fukkireta - LamazeP feat. Kasane Teto',
+  'Song of the Eared Robot - Mimirobo-P feat. Kasane Teto',
+  'Ultra Trailer - Masarada feat. Kasane Teto',
+  'YABABAINA - SatapanP feat. Hatsune Miku, Kasane Teto & Zundamon',
+  'DAI DAI DAI KIRAI - Kasane Teto',
+  'Loop the Room - Tokyo Manaka feat. Kasane Teto',
+  'Doomer - Tokyo Manaka feat. Kasane Teto',
+  'Liar Macaron - Kasane Teto',
+  'Obsolete Meat - Kasane Teto',
+  'FIRE!!! - Jamie Paige feat. Kasane Teto',
+  'Strawberry - Jamie Paige feat. Kasane Teto',
+  'Science - Kasane Teto',
+  'Magic Maid - Kasane Teto',
+  'Ghost Experience - 32ki feat. Kasane Teto',
+  'You Are a Worthless Child - Kasane Teto cover',
+  'Rolling Girl - wowaka / Kasane Teto cover',
+  'Lost One’s Weeping - Neru / Kasane Teto cover',
+  'Rabbit Hole - DECO*27 / Kasane Teto cover',
 ];
 
 export function startBotPresence(client) {
-  let index = Math.floor(Date.now() / 900_000) % TRACKS.length;
+  let index = Math.floor(Date.now() / 180_000) % TRACKS.length;
   const update = () => {
     client.user.setPresence({
       activities: [{ name: TRACKS[index], type: ActivityType.Listening }],
@@ -33,5 +51,5 @@ export function startBotPresence(client) {
     index = (index + 1) % TRACKS.length;
   };
   update();
-  return setInterval(update, 15 * 60 * 1000);
+  return setInterval(update, 3 * 60 * 1000);
 }

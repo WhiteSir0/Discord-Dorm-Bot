@@ -5,7 +5,7 @@ const STATUS_DAYS = ['월', '화', '수', '목'];
 
 export function roomStatusButtons(weekStart) {
   const row = new ActionRowBuilder();
-  let date = weekStart;
+  let date = nextDay(weekStart);
   for (const label of STATUS_DAYS) {
     row.addComponents(
       new ButtonBuilder()

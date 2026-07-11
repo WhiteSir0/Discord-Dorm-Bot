@@ -69,6 +69,8 @@ export async function handleLearningVideoModal(interaction) {
     name: `학습 영상 · ${request.requesterDisplayName}`,
     embeds: [videoRequestEmbed(request)],
     components: [row],
+    applicantUserId: request.userId,
+    fallbackChannelId: interaction.channelId,
   });
   if (post) {
     await attachVideoRequestMessage(interaction.guildId, request.id, post.channelId, post.messageId, post.discussionThreadId);

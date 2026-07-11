@@ -206,10 +206,19 @@ export function renderWeekImage(reservations, weekStart) {
       const x = MARGIN + WEEK_LABEL_W + dayIndex * WEEK_CELL_W;
       const entry = byRoomAndDate.get(`${room.name}:${date}`);
       const isPast = date < today;
-      ctx.fillStyle = isPast ? '#f5f5f5' : '#ffffff';
+      const dow = new Date(`${date}T00:00:00Z`).getUTCDay();
+      const closed = dow === 0 || dow === 5 || dow === 6;
+      ctx.fillStyle = closed ? '#ececec' : isPast ? '#f5f5f5' : '#ffffff';
       ctx.fillRect(x, y, WEEK_CELL_W, WEEK_CELL_H);
       ctx.strokeStyle = '#dddddd';
       ctx.strokeRect(x + 0.5, y + 0.5, WEEK_CELL_W, WEEK_CELL_H);
+
+      if (closed) {
+        ctx.fillStyle = '#999999';
+        ctx.font = 'bold 14px NanumGothic';
+        ctx.fillText('운영 X', x + 12, y + 28);
+        continue;
+      }
 
       if (!entry) {
         ctx.fillStyle = isPast ? '#aaaaaa' : '#777777';

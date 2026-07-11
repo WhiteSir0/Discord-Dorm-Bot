@@ -6,7 +6,7 @@ export default {
   data: new SlashCommandBuilder()
     .setName('채널-세팅')
     .setDescription('이 채널을 특정 용도로 지정합니다.')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .setContexts(InteractionContextType.Guild)
     .addStringOption((opt) =>
       opt
@@ -22,6 +22,10 @@ export default {
     ),
 
   async execute(interaction) {
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+      await interaction.reply({ content: '자치회 인원이 아닙니다.', flags: MessageFlags.Ephemeral });
+      return;
+    }
     const type = interaction.options.getString('타입');
 
     const previous = await updateSettings(interaction.guildId, (settings) => {

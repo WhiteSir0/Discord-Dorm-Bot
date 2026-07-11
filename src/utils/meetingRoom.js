@@ -15,7 +15,8 @@ import { addPrivateThreadMember, findPrivateThreadRequestMessage, privateThreadL
 export const ROOM_NAMES = ROOMS.map((r) => r.name);
 
 const settingsPath = (guildId) => join('guilds', guildId, 'settings.json');
-const reservationsPath = (guildId) => join('guilds', guildId, 'reservations.json');
+const reservationsPath = 'meeting-reservations.json';
+const calendarLink = '[회의실 캘린더에서 보기](https://calendar.google.com/calendar/u/0?cid=NGE1YWJjY2FiM2ZiMDNkOTZlNmE2ZGQ3MjVlMTgxYTAxOTUyMDE2NWQ3NDBlNjQ0OThlMTMyZTY0Njc3M2RjOUBncm91cC5jYWxlbmRhci5nb29nbGUuY29t)';
 
 export function getSettings(guildId) {
   return readJson(settingsPath(guildId), { channels: {} });
@@ -25,8 +26,8 @@ export function updateSettings(guildId, mutator) {
   return updateJson(settingsPath(guildId), { channels: {} }, mutator);
 }
 
-export function getReservations(guildId) {
-  return readJson(reservationsPath(guildId), []);
+export function getReservations() {
+  return readJson(reservationsPath, []);
 }
 
 export async function isRoomOccupied(guildId, room, date) {
@@ -34,8 +35,8 @@ export async function isRoomOccupied(guildId, room, date) {
   return reservations.some((reservation) => reservation.room === room && reservation.date === date && reservation.status === 'approved');
 }
 
-export function updateReservations(guildId, mutator) {
-  return updateJson(reservationsPath(guildId), [], mutator);
+export function updateReservations(_guildId, mutator) {
+  return updateJson(reservationsPath, [], mutator);
 }
 
 export function participantsOf(reservation) {
@@ -64,6 +65,7 @@ export function createReservation(guildId, { room, date, purpose, userId, userNa
     if (conflict) return { ok: false, conflict };
     const reservation = {
       id: randomUUID(),
+      guildId,
       room,
       date,
       purpose,
@@ -182,7 +184,7 @@ async function finishReservationDecision(interaction, decision) {
     ? `<@${reservation.userId}> 회의실 사용 신청이 승인되었습니다.\n처리: <@${reservation.decidedBy}>`
     : `<@${reservation.userId}> 회의실 사용 신청이 거절되었습니다.\n사유: ${reservation.rejectionReason}\n처리: <@${reservation.decidedBy}>`;
   await sendDecisionNotice(interaction.client, reservation.discussionThreadId ?? reservation.requestChannelId, notice, reservation.userId);
-  await refreshStatusBoard(interaction.client, interaction.guildId).catch((err) => log('error', '현황판 갱신 실패:', err.message));
+  await refreshAllStatusBoards(interaction.client).catch((err) => log('error', '현황판 갱신 실패:', err.message));
 }
 
 const ROOM_CALENDAR_COLORS = {
@@ -243,8 +245,8 @@ async function updateReservationRequestMessage(client, reservation) {
   }
 }
 
-export async function syncDeletedCalendarEvents(guildId) {
-  const reservations = await getReservations(guildId);
+export async function syncDeletedCalendarEvents() {
+  const reservations = await getReservations();
   const candidates = reservations.filter((reservation) => reservation.status === 'approved' && reservation.gcalEventId);
   const missingEvents = new Map();
   for (const reservation of candidates) {
@@ -256,7 +258,7 @@ export async function syncDeletedCalendarEvents(guildId) {
   }
   if (!missingEvents.size) return [];
 
-  return updateReservations(guildId, (list) => {
+  return updateReservations(null, (list) => {
     const cancelled = [];
     for (const reservation of list) {
       if (reservation.status !== 'approved' || reservation.gcalEventId !== missingEvents.get(reservation.id)) continue;
@@ -271,36 +273,27 @@ export async function syncDeletedCalendarEvents(guildId) {
 }
 
 export async function syncAllCalendarEvents(client) {
-  const guildsDir = join(process.cwd(), 'database', 'guilds');
-  let guildIds = [];
   try {
-    guildIds = await fs.readdir(guildsDir);
-  } catch {
-    return;
-  }
-  for (const guildId of guildIds) {
-    try {
-      const cancelled = await syncDeletedCalendarEvents(guildId);
-      if (!cancelled.length) continue;
-      for (const reservation of cancelled) {
-        await updateReservationRequestMessage(client, reservation);
-        await sendDecisionNotice(
-          client,
-          reservation.discussionThreadId ?? reservation.requestChannelId,
-          `<@${reservation.userId}> 구글 캘린더 일정이 삭제되어 회의실 예약도 취소되었습니다.`,
-          reservation.userId,
-        );
-      }
-      await refreshStatusBoard(client, guildId);
-    } catch (err) {
-      log('error', `캘린더 동기화 실패 (${guildId}):`, err.message);
+    const cancelled = await syncDeletedCalendarEvents();
+    if (!cancelled.length) return;
+    for (const reservation of cancelled) {
+      await updateReservationRequestMessage(client, reservation);
+      await sendDecisionNotice(
+        client,
+        reservation.discussionThreadId ?? reservation.requestChannelId,
+        `<@${reservation.userId}> 구글 캘린더 일정이 삭제되어 회의실 예약도 취소되었습니다.`,
+        reservation.userId,
+      );
     }
+    await refreshAllStatusBoards(client);
+  } catch (err) {
+    log('error', '캘린더 동기화 실패:', err.message);
   }
 }
 
 export async function cancelReservation(guildId, { room, date, requesterId, isAdmin }) {
   const result = await updateReservations(guildId, (list) => {
-    const r = list.find((x) => x.room === room && x.date === date && isActive(x));
+    const r = list.find((x) => x.guildId === guildId && x.room === room && x.date === date && isActive(x));
     if (!r) return { ok: false, reason: '해당 날짜에 그 회의실 예약이 없어요.' };
     if (r.userId !== requesterId && !isAdmin) {
       return { ok: false, reason: '본인 예약이거나 관리자만 취소할 수 있어요.' };
@@ -373,9 +366,9 @@ export function refreshStatusBoard(client, guildId, { skipUnchanged = false } = 
     let createdWeekMessage = false;
     try {
       if (monthMessage) {
-        await monthMessage.edit({ attachments: [], files: [monthFile], components: [] });
+        await monthMessage.edit({ content: calendarLink, attachments: [], files: [monthFile], components: [] });
       } else {
-        monthMessage = await channel.send({ files: [monthFile] });
+        monthMessage = await channel.send({ content: calendarLink, files: [monthFile] });
         createdMonthMessage = true;
       }
       if (weekMessage) {

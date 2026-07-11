@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, PermissionFlagsBits, MessageFlags, InteractionContextType } from 'discord.js';
-import { cancelReservation, closeRequestMessage, refreshStatusBoard, ROOM_NAMES } from '../../utils/meetingRoom.js';
+import { cancelReservation, closeRequestMessage, refreshAllStatusBoards, ROOM_NAMES } from '../../utils/meetingRoom.js';
 import { isValidDateString } from '../../utils/dateKst.js';
 import { log } from '../../utils/logger.js';
 
@@ -49,7 +49,7 @@ export default {
       `취소됨 · 취소: ${interaction.user.tag}`,
     );
     try {
-      await refreshStatusBoard(interaction.client, interaction.guildId);
+      await refreshAllStatusBoards(interaction.client);
     } catch (err) {
       log('error', '현황판 갱신 실패:', err.message);
     }

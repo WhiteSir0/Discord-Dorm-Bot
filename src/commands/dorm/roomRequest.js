@@ -7,7 +7,7 @@ import {
   SlashCommandBuilder,
   UserSelectMenuBuilder,
 } from 'discord.js';
-import { attachRequestMessage, createReservation, getSettings, isRoomOccupied, refreshStatusBoard, requestEmbed, ROOM_NAMES } from '../../utils/meetingRoom.js';
+import { attachRequestMessage, createReservation, getSettings, isRoomOccupied, refreshAllStatusBoards, requestEmbed, ROOM_NAMES } from '../../utils/meetingRoom.js';
 import { createDraft, setDraftParticipants, takeDraft } from '../../utils/interactionDrafts.js';
 import { formatUser, getUserInfo, resolveRegisteredUsers } from '../../utils/userRegistry.js';
 import { dayOfWeek, isValidDateString, normalizeDateInput, todayKst } from '../../utils/dateKst.js';
@@ -60,8 +60,12 @@ export default {
       await interaction.reply({ content: '먼저 `/학번등록`으로 학번과 이름을 등록해주세요.', flags: MessageFlags.Ephemeral });
       return;
     }
+    if (!info.room) {
+      await interaction.reply({ content: '`/학번등록`을 다시 실행해 기숙사 호실을 등록해주세요.', flags: MessageFlags.Ephemeral });
+      return;
+    }
 
-    const id = await createDraft({ guildId: interaction.guildId, userId: interaction.user.id, room, date, purpose, applicant: { userId: interaction.user.id, studentId: info.studentId, name: info.name } });
+    const id = await createDraft({ guildId: interaction.guildId, userId: interaction.user.id, room, date, purpose, applicant: { userId: interaction.user.id, studentId: info.studentId, name: info.name, dormRoom: info.room } });
     await interaction.reply({
       content: '신청자는 자동으로 포함됩니다. 추가 인원을 선택한 뒤 `신청 등록`을 눌러주세요.',
       components: participantComponents(id),
@@ -134,7 +138,7 @@ export async function handleRoomParticipantConfirm(interaction) {
       const sent = await interaction.followUp({ embeds: [requestEmbed(result.reservation)], components: [row], fetchReply: true });
       await attachRequestMessage(interaction.guildId, result.reservation.id, sent.channelId, sent.id);
     }
-    await refreshStatusBoard(interaction.client, interaction.guildId);
+    await refreshAllStatusBoards(interaction.client);
   } catch (err) {
     log('error', '회의실 신청 후처리 실패:', err.message);
   }

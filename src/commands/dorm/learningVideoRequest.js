@@ -38,6 +38,10 @@ export default {
       await interaction.reply({ content: '먼저 `/학번등록`으로 학번과 이름을 등록해주세요.', flags: MessageFlags.Ephemeral });
       return;
     }
+    if (!info.room) {
+      await interaction.reply({ content: '`/학번등록`을 다시 실행해 기숙사 호실을 등록해주세요.', flags: MessageFlags.Ephemeral });
+      return;
+    }
     const id = await createDraft({ guildId: interaction.guildId, userId: interaction.user.id, userName: formatUser(info), requesterDisplayName: serverDisplayName(interaction) });
     const reference = new TextInputBuilder().setCustomId('reference').setLabel('링크 또는 설명').setPlaceholder('여러 개면 쉼표 또는 줄바꿈으로 구분').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1000);
     const purpose = new TextInputBuilder().setCustomId('purpose').setLabel('학습 목적').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(500);

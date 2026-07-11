@@ -6,6 +6,7 @@ export default {
   data: new SlashCommandBuilder()
     .setName('연장신청')
     .setDescription('주차별 연장 신청을 시작합니다.')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .setContexts(InteractionContextType.Guild)
     .addSubcommand((subcommand) => subcommand.setName('시작').setDescription('이번 주 연장 신청을 시작합니다.'))
     .addSubcommand((subcommand) => subcommand.setName('결과').setDescription('최근 연장 신청 결과를 CSV 파일로 받습니다.')),

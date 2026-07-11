@@ -106,12 +106,12 @@ function csvCell(value) {
 }
 
 export function extensionResultCsv(application) {
-  const rows = [['주차', '요일', '학번', '이름', '신청 시각']];
+  const rows = [['주차', '요일', '학번', '이름', '호실', '신청 시각']];
   for (const day of EXTENSION_DAYS) {
     const entries = [...(application.entries[day.key] ?? [])]
       .sort((a, b) => a.studentId.localeCompare(b.studentId, 'ko'));
     for (const entry of entries) {
-      rows.push([application.label, day.label, entry.studentId, entry.name, entry.appliedAt]);
+      rows.push([application.label, day.label, entry.studentId, entry.name, entry.room ?? '', entry.appliedAt]);
     }
   }
   return Buffer.from(`\ufeff${rows.map((row) => row.map(csvCell).join(',')).join('\r\n')}\r\n`);

@@ -32,9 +32,13 @@ async function toggleExtensionDayButton(interaction, id, day) {
     await interaction.reply({ content: '먼저 `/학번등록`으로 학번과 이름을 등록해주세요.', flags: MessageFlags.Ephemeral });
     return;
   }
+  if (!info.room) {
+    await interaction.reply({ content: '`/학번등록`을 다시 실행해 기숙사 호실을 등록해주세요.', flags: MessageFlags.Ephemeral });
+    return;
+  }
 
   await interaction.deferUpdate();
-  const result = await toggleExtensionDay(interaction.guildId, id, day.key, { userId: interaction.user.id, studentId: info.studentId, name: info.name });
+  const result = await toggleExtensionDay(interaction.guildId, id, day.key, { userId: interaction.user.id, studentId: info.studentId, name: info.name, room: info.room });
   if (result.reason) {
     const content = result.reason === 'limit'
       ? '연장 신청은 월요일부터 목요일 중 최대 2일만 선택할 수 있어요.'

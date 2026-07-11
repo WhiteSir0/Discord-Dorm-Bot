@@ -366,9 +366,9 @@ export function refreshStatusBoard(client, guildId, { skipUnchanged = false } = 
     let createdWeekMessage = false;
     try {
       if (monthMessage) {
-        await monthMessage.edit({ content: calendarLink, attachments: [], files: [monthFile], components: [] });
+        await monthMessage.edit({ content: calendarLink, attachments: [], files: [monthFile], components: [], flags: MessageFlags.SuppressEmbeds });
       } else {
-        monthMessage = await channel.send({ content: calendarLink, files: [monthFile] });
+        monthMessage = await channel.send({ content: calendarLink, files: [monthFile], flags: MessageFlags.SuppressEmbeds });
         createdMonthMessage = true;
       }
       if (weekMessage) {

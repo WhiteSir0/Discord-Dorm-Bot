@@ -22,25 +22,52 @@ export function attachVideoRequestMessage(guildId, id, channelId, messageId, dis
   });
 }
 
-export function videoRequestEmbed(request) {
+function referenceParts(request) {
   const reference = request.reference ?? request.url;
-  let link = null;
-  try {
-    const parsed = new URL(reference);
-    if (['http:', 'https:'].includes(parsed.protocol)) link = parsed.href;
-  } catch {
+  const links = [];
+  const descriptions = [];
+  for (const item of reference.split(/[,\n]+/).map((value) => value.trim()).filter(Boolean)) {
+    try {
+      const parsed = new URL(item);
+      if (['http:', 'https:'].includes(parsed.protocol)) {
+        links.push(parsed.href);
+        continue;
+      }
+    } catch {
+    }
+    descriptions.push(item);
   }
+  return { links, descriptions };
+}
+
+export function videoReferenceLinks(request) {
+  return referenceParts(request).links;
+}
+
+export function videoRequestEmbed(request) {
+  const { links, descriptions } = referenceParts(request);
   const embed = new EmbedBuilder()
     .setTitle('학습 영상 신청')
     .setColor(0xf0b232)
     .addFields(
       { name: '신청자', value: `<@${request.userId}>`, inline: true },
       { name: '학습 시간', value: request.duration, inline: true },
-      { name: '학습 목적', value: request.purpose },
-      { name: '링크 또는 설명', value: link ? `[링크 열기](${link})` : reference },
+      { name: '학습 목적', value: request.purpose, inline: true },
     )
     .setFooter({ text: `승인 대기 중 · ${request.id}` });
-  if (link) embed.setURL(link);
+  if (links.length) {
+    embed.addFields({
+      name: '영상 링크',
+      value: links.map((link, index) => `[링크 ${index + 1} 열기](${link})`).join('\n').slice(0, 1024),
+    });
+    embed.setURL(links[0]);
+  }
+  if (descriptions.length) {
+    embed.addFields({
+      name: '설명',
+      value: descriptions.map((description) => `• ${description}`).join('\n').slice(0, 1024),
+    });
+  }
   return embed;
 }
 
@@ -76,10 +103,9 @@ export async function handleVideoRejectionModal(interaction) {
   }
 
   const id = interaction.customId.split(':')[2];
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  await interaction.deferUpdate();
   const decision = await decideVideoRequest(interaction, id, 'rejected', interaction.fields.getTextInputValue('reason').trim());
   await finishVideoDecision(interaction, decision);
-  if (decision.request) await interaction.editReply({ content: '거절 처리했습니다.' });
 }
 
 async function decideVideoRequest(interaction, id, status, rejectionReason = null) {

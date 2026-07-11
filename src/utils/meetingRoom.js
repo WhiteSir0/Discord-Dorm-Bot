@@ -138,10 +138,9 @@ export async function handleReservationRejectionModal(interaction) {
   }
 
   const id = interaction.customId.split(':')[2];
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  await interaction.deferUpdate();
   const decision = await decideReservation(interaction, id, 'rejected', interaction.fields.getTextInputValue('reason').trim());
   await finishReservationDecision(interaction, decision);
-  if (decision.reservation) await interaction.editReply({ content: '거절 처리했습니다.' });
 }
 
 async function decideReservation(interaction, id, status, rejectionReason = null) {

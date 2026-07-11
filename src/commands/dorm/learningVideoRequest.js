@@ -10,7 +10,7 @@ import {
   TextInputStyle,
 } from 'discord.js';
 import { createDraft, takeDraft } from '../../utils/interactionDrafts.js';
-import { attachVideoRequestMessage, createVideoRequest, videoRequestEmbed } from '../../utils/learningVideo.js';
+import { attachVideoRequestMessage, createVideoRequest, videoReferenceLinks, videoRequestEmbed } from '../../utils/learningVideo.js';
 import { formatUser, getUserInfo } from '../../utils/userRegistry.js';
 import { createApplicationPost } from '../../utils/applicationForum.js';
 import { serverDisplayName } from '../../utils/discordNames.js';
@@ -39,7 +39,7 @@ export default {
       return;
     }
     const id = await createDraft({ guildId: interaction.guildId, userId: interaction.user.id, userName: formatUser(info), requesterDisplayName: serverDisplayName(interaction) });
-    const reference = new TextInputBuilder().setCustomId('reference').setLabel('링크 또는 설명').setPlaceholder('https://... 또는 신청 내용').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1000);
+    const reference = new TextInputBuilder().setCustomId('reference').setLabel('링크 또는 설명').setPlaceholder('여러 개면 쉼표 또는 줄바꿈으로 구분').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1000);
     const purpose = new TextInputBuilder().setCustomId('purpose').setLabel('학습 목적').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(500);
     const duration = new TextInputBuilder().setCustomId('duration').setLabel('학습 시간').setPlaceholder('예: 약 20분').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(60);
     await interaction.showModal(new ModalBuilder()
@@ -69,6 +69,7 @@ export async function handleLearningVideoModal(interaction) {
     new ButtonBuilder().setCustomId(`lv:reject:${request.id}`).setLabel('거절').setStyle(ButtonStyle.Danger),
   );
   const embed = videoRequestEmbed(request);
+  const previewUrls = videoReferenceLinks(request);
   await interaction.reply({ embeds: [embed], components: [row] });
   const parentMessage = await interaction.fetchReply();
   const post = await createApplicationPost(interaction.client, interaction.guildId, '학습영상신청', {
@@ -78,6 +79,7 @@ export async function handleLearningVideoModal(interaction) {
     applicantUserId: request.userId,
     fallbackChannelId: interaction.channelId,
     parentMessage,
+    previewUrls,
   });
   if (post) {
     await attachVideoRequestMessage(interaction.guildId, request.id, post.channelId, post.messageId, post.discussionThreadId);

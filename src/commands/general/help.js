@@ -1,13 +1,31 @@
-import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, InteractionContextType, MessageFlags } from 'discord.js';
 import { config } from '../../config.js';
 
-function buildHelpEmbed(client) {
-  const lines = [...client.commands.values()].map((cmd) => {
-    const prefixPart = config.prefix && typeof cmd.executePrefix === 'function' && cmd.aliases?.length
-      ? ` (커맨드: ${cmd.aliases.map((a) => `\`${config.prefix}${a}\``).join(' ')})`
-      : '';
-    return `**/${cmd.data.name}** — ${cmd.data.description}${prefixPart}`;
-  });
+function canUseCommand(command, permissions) {
+  const required = command.data.toJSON().default_member_permissions;
+  return !required || permissions?.has(BigInt(required));
+}
+
+function commandLines(command) {
+  const data = command.data.toJSON();
+  const subcommands = data.options?.filter((option) => option.type === 1) ?? [];
+  if (subcommands.length) {
+    return subcommands.map((subcommand) => `**/${data.name} ${subcommand.name}** — ${subcommand.description}`);
+  }
+  return [`**/${data.name}** — ${data.description}`];
+}
+
+function buildHelpEmbed(client, permissions) {
+  const lines = [...client.commands.values()]
+    .filter((command) => canUseCommand(command, permissions))
+    .flatMap((cmd) => {
+      const prefixPart = config.prefix && typeof cmd.executePrefix === 'function' && cmd.aliases?.length
+        ? ` (커맨드: ${cmd.aliases.map((a) => `\`${config.prefix}${a}\``).join(' ')})`
+        : '';
+      const entries = commandLines(cmd);
+      if (prefixPart) entries[0] += prefixPart;
+      return entries;
+    });
 
   return new EmbedBuilder()
     .setTitle('📖 명령어 목록')
@@ -16,14 +34,17 @@ function buildHelpEmbed(client) {
 }
 
 export default {
-  data: new SlashCommandBuilder().setName('help').setDescription('사용 가능한 명령어 목록을 보여줍니다.'),
+  data: new SlashCommandBuilder()
+    .setName('도움말')
+    .setDescription('사용 가능한 명령어 목록을 보여줍니다.')
+    .setContexts(InteractionContextType.Guild),
   aliases: ['help', '도움', '도움말'],
 
   async execute(interaction) {
-    await interaction.reply({ embeds: [buildHelpEmbed(interaction.client)] });
+    await interaction.reply({ embeds: [buildHelpEmbed(interaction.client, interaction.memberPermissions)], flags: MessageFlags.Ephemeral });
   },
 
   async executePrefix(message) {
-    await message.reply({ embeds: [buildHelpEmbed(message.client)] });
+    await message.reply({ embeds: [buildHelpEmbed(message.client, message.member?.permissions)] });
   },
 };

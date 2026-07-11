@@ -24,6 +24,10 @@ export function isValidDateString(s) {
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
 }
 
+export function normalizeDateInput(s) {
+  return /^\d{2}-\d{2}$/.test(s) ? `${todayKst().slice(0, 4)}-${s}` : s;
+}
+
 export function nextDay(dateStr) {
   const d = new Date(`${dateStr}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + 1);

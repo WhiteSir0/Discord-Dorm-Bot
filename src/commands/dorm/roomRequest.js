@@ -10,7 +10,7 @@ import {
 import { attachRequestMessage, createReservation, isRoomOccupied, refreshStatusBoard, requestEmbed, ROOM_NAMES } from '../../utils/meetingRoom.js';
 import { createDraft, setDraftParticipants, takeDraft } from '../../utils/interactionDrafts.js';
 import { formatUser, getUserInfo, resolveRegisteredUsers } from '../../utils/userRegistry.js';
-import { dayOfWeek, isValidDateString, todayKst } from '../../utils/dateKst.js';
+import { dayOfWeek, isValidDateString, normalizeDateInput, todayKst } from '../../utils/dateKst.js';
 import { log } from '../../utils/logger.js';
 import { createRoomRequestThread } from '../../utils/roomRequestThread.js';
 import { serverDisplayName } from '../../utils/discordNames.js';
@@ -22,15 +22,15 @@ export default {
     .setContexts(InteractionContextType.Guild)
     .addStringOption((opt) => opt.setName('회의실').setDescription('사용할 회의실').setRequired(true)
       .addChoices(...ROOM_NAMES.map((name) => ({ name, value: name }))))
-    .addStringOption((opt) => opt.setName('날짜').setDescription('사용 날짜 (예: 2026-07-15)').setRequired(true))
+    .addStringOption((opt) => opt.setName('날짜').setDescription('사용 날짜 (예: 07-16)').setRequired(true))
     .addStringOption((opt) => opt.setName('목적').setDescription('사용 목적').setRequired(true).setMaxLength(80)),
 
   async execute(interaction) {
     const room = interaction.options.getString('회의실');
-    const date = interaction.options.getString('날짜');
+    const date = normalizeDateInput(interaction.options.getString('날짜'));
     const purpose = interaction.options.getString('목적');
     if (!isValidDateString(date)) {
-      await interaction.reply({ content: '날짜 형식이 잘못됐어요. `2026-07-15` 형식으로 입력해주세요.', flags: MessageFlags.Ephemeral });
+      await interaction.reply({ content: '날짜 형식이 잘못됐어요. `07-16` 형식으로 입력해주세요.', flags: MessageFlags.Ephemeral });
       return;
     }
     if (date < todayKst()) {

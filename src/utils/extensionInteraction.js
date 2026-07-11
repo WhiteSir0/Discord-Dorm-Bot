@@ -1,5 +1,5 @@
 import { MessageFlags, PermissionFlagsBits } from 'discord.js';
-import { EXTENSION_DAYS, cancelExtensionEntries, closeExtensionDay, extensionButtons, extensionCloseButtons, extensionControlButtons, extensionEmbed, extensionExcludeButtons, getExtensionApplication, toggleExtensionDay, toggleExtensionDayExclusion } from './extensionApplication.js';
+import { EXTENSION_DAYS, cancelExtensionEntries, closeExtensionApplication, extensionButtons, extensionControlButtons, extensionEmbed, extensionExcludeButtons, getExtensionApplication, toggleExtensionDay, toggleExtensionDayExclusion } from './extensionApplication.js';
 import { getUserInfo } from './userRegistry.js';
 
 export async function handleExtensionButton(interaction) {
@@ -9,7 +9,7 @@ export async function handleExtensionButton(interaction) {
     return;
   }
   if (action === 'manage') {
-    await openExtensionClosing(interaction, id);
+    await closeEntireExtension(interaction, id);
     return;
   }
   if (action === 'cancel') {
@@ -23,10 +23,6 @@ export async function handleExtensionButton(interaction) {
   const day = EXTENSION_DAYS.find((item) => item.key === dayKey);
   if (!day) return;
 
-  if (action === 'close') {
-    await closeExtensionDayButton(interaction, id, day);
-    return;
-  }
   await toggleExtensionDayButton(interaction, id, day);
 }
 
@@ -85,21 +81,15 @@ async function cancelExtensionApplication(interaction, id) {
   await interaction.followUp({ content: `연장 신청 ${result.removed}건을 취소했어요.`, flags: MessageFlags.Ephemeral });
 }
 
-async function openExtensionClosing(interaction, id) {
+async function closeEntireExtension(interaction, id) {
   if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
     await interaction.reply({ content: '자치회 인원이 아닙니다.', flags: MessageFlags.Ephemeral });
     return;
   }
-  const application = await getExtensionApplication(interaction.guildId, id);
-  if (!application || application.status !== 'active') {
-    await interaction.reply({ content: '이 연장 신청은 종료됐어요.', flags: MessageFlags.Ephemeral });
-    return;
-  }
-  await interaction.reply({
-    content: `${application.label} 요일별 연장 신청을 마감합니다.`,
-    components: [extensionCloseButtons(application)],
-    flags: MessageFlags.Ephemeral,
-  });
+  await interaction.deferUpdate();
+  const result = await closeExtensionApplication(interaction.guildId, id);
+  if (result.reason) return;
+  await updateApplicationMessage(interaction.client, result.application);
 }
 
 async function toggleExtensionExclusion(interaction, id, dayKey) {
@@ -121,23 +111,6 @@ async function toggleExtensionExclusion(interaction, id, dayKey) {
       : `${day.label} 제외를 취소했습니다. 이제 다시 신청할 수 있어요.`,
     components: [extensionExcludeButtons(result.application)],
   });
-}
-
-async function closeExtensionDayButton(interaction, id, day) {
-  if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
-    await interaction.reply({ content: '자치회 인원이 아닙니다.', flags: MessageFlags.Ephemeral });
-    return;
-  }
-
-  await interaction.deferUpdate();
-  const result = await closeExtensionDay(interaction.guildId, id, day.key);
-  if (result.reason) {
-    await interaction.followUp({ content: result.reason === 'already' ? `${day.label}은 이미 마감됐어요.` : '이 연장 신청은 종료됐어요.', flags: MessageFlags.Ephemeral });
-    return;
-  }
-  await updateApplicationMessage(interaction.client, result.application);
-  await interaction.message.edit({ components: [extensionCloseButtons(result.application)] }).catch(() => {});
-  await interaction.followUp({ content: `${day.label} 연장 신청을 마감했어요.`, flags: MessageFlags.Ephemeral });
 }
 
 async function updateApplicationMessage(client, application) {

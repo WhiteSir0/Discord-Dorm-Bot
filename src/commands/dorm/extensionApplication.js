@@ -1,17 +1,35 @@
-import { ChannelType, InteractionContextType, MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
+import { AttachmentBuilder, ChannelType, InteractionContextType, MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { getSettings } from '../../utils/meetingRoom.js';
-import { extensionButtons, extensionControlButtons, extensionEmbed, setExtensionMessage, startExtensionApplication } from '../../utils/extensionApplication.js';
+import { extensionButtons, extensionControlButtons, extensionEmbed, extensionResultCsv, getLatestExtensionApplication, setExtensionMessage, startExtensionApplication } from '../../utils/extensionApplication.js';
 
 export default {
   data: new SlashCommandBuilder()
     .setName('연장신청')
     .setDescription('주차별 연장 신청을 시작합니다.')
     .setContexts(InteractionContextType.Guild)
-    .addSubcommand((subcommand) => subcommand.setName('시작').setDescription('이번 주 연장 신청을 시작합니다.')),
+    .addSubcommand((subcommand) => subcommand.setName('시작').setDescription('이번 주 연장 신청을 시작합니다.'))
+    .addSubcommand((subcommand) => subcommand.setName('결과').setDescription('최근 연장 신청 결과를 CSV 파일로 받습니다.')),
 
   async execute(interaction) {
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
       await interaction.reply({ content: '자치회 인원이 아닙니다.', flags: MessageFlags.Ephemeral });
+      return;
+    }
+
+    if (interaction.options.getSubcommand() === '결과') {
+      const application = await getLatestExtensionApplication(interaction.guildId);
+      if (!application) {
+        await interaction.reply({ content: '저장된 연장 신청 결과가 없어요.', flags: MessageFlags.Ephemeral });
+        return;
+      }
+      const file = new AttachmentBuilder(extensionResultCsv(application), {
+        name: `extension-${application.weekKey}.csv`,
+      });
+      await interaction.reply({
+        content: `${application.label} 연장 신청 결과입니다.`,
+        files: [file],
+        flags: MessageFlags.Ephemeral,
+      });
       return;
     }
 

@@ -57,6 +57,11 @@ export function getActiveExtensionApplication(guildId) {
     .then((data) => data.applications.find((application) => application.status === 'active') ?? null);
 }
 
+export function getLatestExtensionApplication(guildId) {
+  return readJson(applicationsPath(guildId), { applications: [] })
+    .then((data) => data.applications.at(-1) ?? null);
+}
+
 export function setExtensionMessage(guildId, id, channelId, messageId) {
   return updateJson(applicationsPath(guildId), { applications: [] }, (data) => {
     const application = data.applications.find((item) => item.id === id);
@@ -84,14 +89,32 @@ export function toggleExtensionDay(guildId, id, dayKey, participant) {
   });
 }
 
-export function closeExtensionDay(guildId, id, dayKey) {
+export function closeExtensionApplication(guildId, id) {
   return updateJson(applicationsPath(guildId), { applications: [] }, (data) => {
     const application = data.applications.find((item) => item.id === id);
     if (!application || application.status !== 'active') return { reason: 'closed' };
-    if (application.closedDays.includes(dayKey)) return { reason: 'already' };
-    application.closedDays.push(dayKey);
+    application.status = 'closed';
+    application.closedDays = EXTENSION_DAYS.map((day) => day.key);
+    application.closedAt = new Date().toISOString();
     return { application };
   });
+}
+
+function csvCell(value) {
+  const text = String(value ?? '');
+  return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+export function extensionResultCsv(application) {
+  const rows = [['주차', '요일', '학번', '이름', '신청 시각']];
+  for (const day of EXTENSION_DAYS) {
+    const entries = [...(application.entries[day.key] ?? [])]
+      .sort((a, b) => a.studentId.localeCompare(b.studentId, 'ko'));
+    for (const entry of entries) {
+      rows.push([application.label, day.label, entry.studentId, entry.name, entry.appliedAt]);
+    }
+  }
+  return Buffer.from(`\ufeff${rows.map((row) => row.map(csvCell).join(',')).join('\r\n')}\r\n`);
 }
 
 export function cancelExtensionEntries(guildId, id, userId) {
@@ -165,18 +188,6 @@ export function extensionControlButtons(application) {
       .setEmoji('⚙️')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(application.status !== 'active'),
-  );
-}
-
-export function extensionCloseButtons(application) {
-  return new ActionRowBuilder().addComponents(
-    ...EXTENSION_DAYS.map((day) =>
-    new ButtonBuilder()
-      .setCustomId(`ex:close:${application.id}:${day.key}`)
-      .setLabel(`${day.short} 연장 신청 종료`)
-      .setStyle(ButtonStyle.Danger)
-      .setDisabled(application.status !== 'active' || application.closedDays.includes(day.key) || application.excludedDays?.includes(day.key)),
-    ),
   );
 }
 

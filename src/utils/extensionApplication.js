@@ -152,7 +152,7 @@ export function toggleExtensionDayExclusion(guildId, id, dayKey) {
 export function extensionEmbed(application) {
   return new EmbedBuilder()
     .setTitle(`${application.label} 연장 신청`)
-    .setColor(application.status === 'active' ? 0x5865f2 : 0x99aab5)
+    .setColor(application.status === 'active' ? 0x5865f2 : 0xd83c3e)
     .setDescription('월요일부터 목요일 중 최대 2일을 선택할 수 있습니다. 같은 요일을 다시 누르면 취소됩니다.')
     .addFields(EXTENSION_DAYS.map((day) => ({
       name: day.label,

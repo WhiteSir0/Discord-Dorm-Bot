@@ -13,13 +13,13 @@ export const ROOMS = [
 const CELL_W = 150;
 const CELL_H = 118;
 const MARGIN = 16;
-const HEADER_H = 64;
+const HEADER_H = 98;
 const WEEKDAY_H = 34;
 const FOOTER_H = 14;
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 const WEEK_CELL_W = 210;
 const WEEK_CELL_H = 150;
-const WEEK_LABEL_W = 82;
+const WEEK_LABEL_W = 138;
 const WEEK_HEADER_H = 70;
 
 function participantsOf(entry) {
@@ -65,21 +65,26 @@ export function renderMonthImage(reservations, year, month) {
   ctx.fillStyle = '#222222';
   ctx.font = 'bold 30px NanumGothic';
   ctx.textBaseline = 'middle';
-  ctx.fillText(`${year}년 ${month}월 회의실 예약 현황`, MARGIN, HEADER_H / 2 + 2);
+  ctx.fillText(`${year}년 ${month}월 회의실 예약 현황`, MARGIN, 30);
 
-  let legendX = width - MARGIN;
-  for (let i = ROOMS.length - 1; i >= 0; i--) {
-    const room = ROOMS[i];
-    ctx.font = '16px NanumGothic';
-    const labelW = ctx.measureText(room.name).width;
-    legendX -= labelW;
-    ctx.fillStyle = '#444444';
-    ctx.fillText(room.name, legendX, HEADER_H / 2 + 2);
-    legendX -= 22;
-    ctx.fillStyle = room.color;
-    roundRect(ctx, legendX, HEADER_H / 2 - 7, 16, 16, 4);
+  ctx.font = '16px NanumGothic';
+  const legendItems = ROOMS.map((room) => ({
+    room,
+    width: 16 + 8 + ctx.measureText(room.name).width,
+  }));
+  const legendGap = 24;
+  const legendWidth = legendItems.reduce((sum, item) => sum + item.width, 0)
+    + legendGap * (legendItems.length - 1);
+  let legendX = Math.max(MARGIN, (width - legendWidth) / 2);
+  const legendY = 76;
+  for (const item of legendItems) {
+    ctx.fillStyle = item.room.color;
+    roundRect(ctx, legendX, legendY - 8, 16, 16, 4);
     ctx.fill();
-    legendX -= 18;
+    legendX += 24;
+    ctx.fillStyle = '#444444';
+    ctx.fillText(item.room.name, legendX, legendY);
+    legendX += item.width - 24 + legendGap;
   }
 
   ctx.font = 'bold 17px NanumGothic';

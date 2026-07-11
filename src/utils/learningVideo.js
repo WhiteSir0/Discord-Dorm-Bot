@@ -44,6 +44,50 @@ export function videoReferenceLinks(request) {
   return referenceParts(request).links;
 }
 
+function youtubeVideoId(link) {
+  const url = new URL(link);
+  if (url.hostname === 'youtu.be') return url.pathname.split('/').filter(Boolean)[0] ?? null;
+  if (!['youtube.com', 'www.youtube.com', 'm.youtube.com'].includes(url.hostname)) return null;
+  if (url.pathname === '/watch') return url.searchParams.get('v');
+  const [type, id] = url.pathname.split('/').filter(Boolean);
+  return ['shorts', 'embed', 'live'].includes(type) ? id ?? null : null;
+}
+
+export async function videoPreviewEmbeds(links) {
+  return Promise.all(links.slice(0, 9).map(async (link, index) => {
+    const videoId = youtubeVideoId(link);
+    if (!videoId) {
+      return new EmbedBuilder()
+        .setTitle(`링크 ${index + 1} 열기`)
+        .setURL(link)
+        .setColor(0x5865f2);
+    }
+
+    let metadata = null;
+    try {
+      const response = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(link)}&format=json`);
+      if (response.ok) metadata = await response.json();
+    } catch {
+    }
+    let thumbnail = metadata?.thumbnail_url ?? null;
+    if (!thumbnail) {
+      const candidate = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+      try {
+        const response = await fetch(candidate);
+        if (response.ok) thumbnail = candidate;
+      } catch {
+      }
+    }
+    const embed = new EmbedBuilder()
+      .setTitle(metadata?.title ?? `YouTube 영상 ${index + 1}`)
+      .setURL(link)
+      .setColor(0xff0033);
+    if (thumbnail) embed.setImage(thumbnail);
+    if (metadata?.author_name) embed.setAuthor({ name: metadata.author_name });
+    return embed;
+  }));
+}
+
 export function videoRequestEmbed(request) {
   const { links, descriptions } = referenceParts(request);
   const embed = new EmbedBuilder()
@@ -159,7 +203,8 @@ async function updateVideoRequestMessage(client, request) {
       .setColor(approved ? 0x3ba55d : 0xd83c3e)
       .setFooter({ text: `${approved ? '승인됨' : '거절됨'} · 처리: ${request.decidedByName}` });
     if (request.rejectionReason) threadEmbed.addFields({ name: '거절 사유', value: request.rejectionReason });
-    await threadMessage.edit({ embeds: [threadEmbed] }).catch(() => {});
+    const previews = threadMessage.embeds.slice(1).map((preview) => EmbedBuilder.from(preview));
+    await threadMessage.edit({ embeds: [threadEmbed, ...previews], components: [] }).catch(() => {});
   }
 }
 

@@ -10,7 +10,7 @@ import {
   TextInputStyle,
 } from 'discord.js';
 import { createDraft, takeDraft } from '../../utils/interactionDrafts.js';
-import { attachVideoRequestMessage, createVideoRequest, videoReferenceLinks, videoRequestEmbed } from '../../utils/learningVideo.js';
+import { attachVideoRequestMessage, createVideoRequest, videoPreviewEmbeds, videoReferenceLinks, videoRequestEmbed } from '../../utils/learningVideo.js';
 import { formatUser, getUserInfo } from '../../utils/userRegistry.js';
 import { createApplicationPost } from '../../utils/applicationForum.js';
 import { serverDisplayName } from '../../utils/discordNames.js';
@@ -72,6 +72,7 @@ export async function handleLearningVideoModal(interaction) {
   const previewUrls = videoReferenceLinks(request);
   await interaction.reply({ embeds: [embed], components: [row] });
   const parentMessage = await interaction.fetchReply();
+  const previewEmbeds = await videoPreviewEmbeds(previewUrls);
   const post = await createApplicationPost(interaction.client, interaction.guildId, '학습영상신청', {
     name: `학습 영상 · ${request.requesterDisplayName}`,
     embeds: [embed],
@@ -79,7 +80,7 @@ export async function handleLearningVideoModal(interaction) {
     applicantUserId: request.userId,
     fallbackChannelId: interaction.channelId,
     parentMessage,
-    previewUrls,
+    previewEmbeds,
   });
   if (post) {
     await attachVideoRequestMessage(interaction.guildId, request.id, post.channelId, post.messageId, post.discussionThreadId);

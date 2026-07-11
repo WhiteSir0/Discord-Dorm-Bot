@@ -20,10 +20,10 @@ export async function createPrivateApplicationThread(channel, guildId, payload) 
     invitable: false,
   });
   await thread.members.add(payload.applicantUserId);
-  const previews = payload.previewUrls?.length ? `\n${payload.previewUrls.join('\n')}` : '';
   await thread.send({
-    content: `<@${payload.applicantUserId}> 신청 관련 대화 스레드입니다.${previews}`,
-    embeds: payload.embeds,
+    content: `<@${payload.applicantUserId}> 신청 관련 대화 스레드입니다.`,
+    embeds: [...payload.embeds, ...(payload.previewEmbeds ?? [])],
+    components: payload.components,
     allowedMentions: { users: [payload.applicantUserId] },
   });
   await message.edit({ components: [...payload.components, privateThreadLinkRow(guildId, thread.id)] });

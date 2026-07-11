@@ -238,7 +238,8 @@ async function updateReservationRequestMessage(client, reservation) {
       .setColor(approved ? 0x3ba55d : reservation.status === 'cancelled' ? 0x99aab5 : 0xd83c3e)
       .setFooter({ text: `${statusLabel(reservation.status)} · 처리: ${actorName}` });
     if (reservation.rejectionReason) threadEmbed.addFields({ name: '거절 사유', value: reservation.rejectionReason });
-    await threadMessage.edit({ embeds: [threadEmbed] }).catch(() => {});
+    const previews = threadMessage.embeds.slice(1).map((preview) => EmbedBuilder.from(preview));
+    await threadMessage.edit({ embeds: [threadEmbed, ...previews], components: [] }).catch(() => {});
   }
 }
 

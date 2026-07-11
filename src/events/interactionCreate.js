@@ -5,6 +5,7 @@ import { handleVideoRejectionModal, handleVideoRequestButton } from '../utils/le
 import { handleRoomParticipantCancel, handleRoomParticipantConfirm, handleRoomParticipantSelect } from '../commands/dorm/roomRequest.js';
 import { handleLearningVideoModal } from '../commands/dorm/learningVideoRequest.js';
 import { handleExtensionButton } from '../utils/extensionInteraction.js';
+import { handleRoomStatusButton } from '../commands/dorm/roomStatus.js';
 
 export default {
   name: Events.InteractionCreate,
@@ -14,6 +15,15 @@ export default {
         await handleExtensionButton(interaction);
       } catch (err) {
         log('error', '연장 신청 버튼 처리 오류:', err);
+      }
+      return;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('room-status:')) {
+      try {
+        await handleRoomStatusButton(interaction);
+      } catch (err) {
+        log('error', '회의실 현황 버튼 처리 오류:', err);
       }
       return;
     }

@@ -2,9 +2,12 @@ import { createCanvas } from 'canvas';
 import { todayKst } from './dateKst.js';
 
 export const ROOMS = [
-  { name: '2층', color: '#5865f2', text: '#ffffff' },
-  { name: '3층', color: '#3ba55d', text: '#ffffff' },
-  { name: '4층', color: '#e8873a', text: '#ffffff' },
+  { name: '2층 회의실_1', color: '#5865f2', text: '#ffffff' },
+  { name: '2층 회의실_2', color: '#5865f2', text: '#ffffff' },
+  { name: '3층 회의실_1', color: '#3ba55d', text: '#ffffff' },
+  { name: '3층 회의실_2', color: '#3ba55d', text: '#ffffff' },
+  { name: '4층 회의실_1', color: '#e8873a', text: '#ffffff' },
+  { name: '4층 회의실_2', color: '#e8873a', text: '#ffffff' },
 ];
 
 const CELL_W = 150;
@@ -203,19 +206,10 @@ export function renderWeekImage(reservations, weekStart) {
       const x = MARGIN + WEEK_LABEL_W + dayIndex * WEEK_CELL_W;
       const entry = byRoomAndDate.get(`${room.name}:${date}`);
       const isPast = date < today;
-      const dow = new Date(`${date}T00:00:00Z`).getUTCDay();
-      const closed = dow === 0 || dow === 5 || dow === 6;
-      ctx.fillStyle = closed ? '#ececec' : isPast ? '#f5f5f5' : '#ffffff';
+      ctx.fillStyle = isPast ? '#f5f5f5' : '#ffffff';
       ctx.fillRect(x, y, WEEK_CELL_W, WEEK_CELL_H);
       ctx.strokeStyle = '#dddddd';
       ctx.strokeRect(x + 0.5, y + 0.5, WEEK_CELL_W, WEEK_CELL_H);
-
-      if (closed) {
-        ctx.fillStyle = '#999999';
-        ctx.font = 'bold 14px NanumGothic';
-        ctx.fillText('운영 X', x + 12, y + 28);
-        continue;
-      }
 
       if (!entry) {
         ctx.fillStyle = isPast ? '#aaaaaa' : '#777777';

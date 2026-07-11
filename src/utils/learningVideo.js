@@ -14,10 +14,10 @@ export function createVideoRequest(guildId, data) {
   });
 }
 
-export function attachVideoRequestMessage(guildId, id, channelId, messageId) {
+export function attachVideoRequestMessage(guildId, id, channelId, messageId, discussionThreadId = null) {
   return updateJson(requestsPath(guildId), [], (requests) => {
     const request = requests.find((item) => item.id === id);
-    if (request) Object.assign(request, { requestChannelId: channelId, requestMessageId: messageId });
+    if (request) Object.assign(request, { requestChannelId: channelId, requestMessageId: messageId, discussionThreadId });
   });
 }
 
@@ -102,7 +102,7 @@ async function finishVideoDecision(interaction, decision) {
   const notice = request.status === 'approved'
     ? `<@${request.userId}> 확인했습니다. 관리실에서 머리띠 받아가세요.\n처리: **${request.decidedByName}**`
     : `<@${request.userId}> 학습 영상 신청이 거절되었습니다.\n사유: ${request.rejectionReason}\n처리: **${request.decidedByName}**`;
-  await sendDecisionNotice(interaction.client, request.requestChannelId, notice, request.userId);
+  await sendDecisionNotice(interaction.client, request.discussionThreadId ?? request.requestChannelId, notice, request.userId);
 }
 
 async function updateVideoRequestMessage(client, request) {

@@ -28,7 +28,12 @@ export default {
       await oldMessage?.edit({ embeds: [extensionEmbed(result.previous)], components: [extensionButtons(result.previous), extensionControlButtons(result.previous)] }).catch(() => {});
     }
 
-    const payload = { embeds: [extensionEmbed(result.application)], components: [extensionButtons(result.application), extensionControlButtons(result.application)] };
+    const payload = {
+      content: '@everyone',
+      allowedMentions: { parse: ['everyone'] },
+      embeds: [extensionEmbed(result.application)],
+      components: [extensionButtons(result.application), extensionControlButtons(result.application)],
+    };
     const settings = await getSettings(interaction.guildId);
     const configuredChannel = await interaction.client.channels.fetch(settings.channels?.['연장신청']?.channelId).catch(() => null);
     if (configuredChannel?.type === ChannelType.GuildText) {

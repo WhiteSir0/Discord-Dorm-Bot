@@ -17,7 +17,7 @@ export default {
           { name: '회의실 현황', value: '회의실' },
           { name: '회의실 신청 채널', value: '회의실신청' },
           { name: '연장 신청 채널', value: '연장신청' },
-          { name: '학습 영상 신청 포럼', value: '학습영상신청' },
+          { name: '학습 영상 신청 채널', value: '학습영상신청' },
         ),
     ),
 
@@ -39,14 +39,12 @@ export default {
     } else {
       await interaction.reply({ content: `이 채널이 **${type}** 채널로 지정됐어요.`, flags: MessageFlags.Ephemeral });
       const old = previous.prev;
-      if (type === '회의실' && old?.channelId) {
-        for (const oldMessageId of [old.messageId, old.monthMessageId, old.weekMessageId].filter(Boolean)) {
-          try {
-            const channel = await interaction.client.channels.fetch(old.channelId);
-            const message = await channel.messages.fetch(oldMessageId);
-            await message.delete();
-          } catch {
-          }
+      if (type === '회의실' && old?.channelId && old.messageId) {
+        try {
+          const channel = await interaction.client.channels.fetch(old.channelId);
+          const message = await channel.messages.fetch(old.messageId);
+          await message.delete();
+        } catch {
         }
       }
     }

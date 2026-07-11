@@ -7,10 +7,10 @@ import {
   SlashCommandBuilder,
   UserSelectMenuBuilder,
 } from 'discord.js';
-import { attachRequestMessage, createReservation, refreshStatusBoard, requestEmbed, ROOM_NAMES } from '../../utils/meetingRoom.js';
+import { attachRequestMessage, createReservation, isRoomOccupied, refreshStatusBoard, requestEmbed, ROOM_NAMES } from '../../utils/meetingRoom.js';
 import { createDraft, setDraftParticipants, takeDraft } from '../../utils/interactionDrafts.js';
 import { formatUser, getUserInfo, resolveRegisteredUsers } from '../../utils/userRegistry.js';
-import { isValidDateString, todayKst, dayOfWeek } from '../../utils/dateKst.js';
+import { isValidDateString, todayKst } from '../../utils/dateKst.js';
 import { log } from '../../utils/logger.js';
 import { createRoomRequestThread } from '../../utils/roomRequestThread.js';
 import { serverDisplayName } from '../../utils/discordNames.js';
@@ -37,8 +37,8 @@ export default {
       await interaction.reply({ content: '지난 날짜는 신청할 수 없어요.', flags: MessageFlags.Ephemeral });
       return;
     }
-    if ([0, 5, 6].includes(dayOfWeek(date))) {
-      await interaction.reply({ content: '회의실은 월~목요일만 신청할 수 있어요.', flags: MessageFlags.Ephemeral });
+    if (await isRoomOccupied(interaction.guildId, room, date)) {
+      await interaction.reply({ content: `**${date} ${room}**은 이미 사용 중이라 비어있지 않아요.`, flags: MessageFlags.Ephemeral });
       return;
     }
     const info = await getUserInfo(interaction.guildId, interaction.user.id);

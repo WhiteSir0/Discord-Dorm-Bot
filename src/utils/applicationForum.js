@@ -7,7 +7,15 @@ export async function createApplicationPost(client, guildId, type, payload) {
   if (!channelId) return null;
 
   const channel = await client.channels.fetch(channelId).catch(() => null);
-  if (!channel || channel.type !== ChannelType.GuildForum) return null;
+  if (!channel) return null;
+
+  if (channel.type === ChannelType.GuildText) {
+    const message = await channel.send({ embeds: payload.embeds, components: payload.components });
+    const thread = await message.startThread({ name: payload.name.slice(0, 100), autoArchiveDuration: 10_080 });
+    return { channelId: channel.id, messageId: message.id, discussionThreadId: thread.id };
+  }
+
+  if (channel.type !== ChannelType.GuildForum) return null;
 
   const thread = await channel.threads.create({
     name: payload.name.slice(0, 100),

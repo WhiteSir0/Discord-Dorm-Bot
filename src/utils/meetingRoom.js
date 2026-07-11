@@ -9,6 +9,7 @@ import { createAllDayEvent, deleteEvent, eventExists } from './gcal.js';
 import { log } from './logger.js';
 import { sendDecisionNotice } from './applicationForum.js';
 import { serverDisplayName } from './discordNames.js';
+import { roomStatusButtons } from './roomStatusButtons.js';
 
 export const ROOM_NAMES = ROOMS.map((r) => r.name);
 
@@ -25,6 +26,11 @@ export function updateSettings(guildId, mutator) {
 
 export function getReservations(guildId) {
   return readJson(reservationsPath(guildId), []);
+}
+
+export async function isRoomOccupied(guildId, room, date) {
+  const reservations = await getReservations(guildId);
+  return reservations.some((reservation) => reservation.room === room && reservation.date === date && reservation.status === 'approved');
 }
 
 export function updateReservations(guildId, mutator) {
@@ -53,7 +59,7 @@ function statusLabel(status) {
 
 export function createReservation(guildId, { room, date, purpose, userId, userName, requesterDisplayName, participants }) {
   return updateReservations(guildId, (list) => {
-    const conflict = list.find((r) => r.room === room && r.date === date && isActive(r));
+    const conflict = list.find((r) => r.room === room && r.date === date && r.status === 'approved');
     if (conflict) return { ok: false, conflict };
     const reservation = {
       id: randomUUID(),
@@ -142,6 +148,8 @@ async function decideReservation(interaction, id, status, rejectionReason = null
     const reservation = list.find((item) => item.id === id);
     if (!reservation) return { missing: true };
     if (reservation.status !== 'pending') return { already: reservation.status };
+    const conflict = list.find((item) => item.id !== id && item.room === reservation.room && item.date === reservation.date && item.status === 'approved');
+    if (conflict) return { conflict };
     reservation.status = status;
     reservation.decidedBy = interaction.user.id;
     reservation.decidedByName = serverDisplayName(interaction);
@@ -161,6 +169,10 @@ async function finishReservationDecision(interaction, decision) {
     await interaction.followUp({ content: `이미 처리된 신청이에요 (${statusLabel(decision.already)}).`, flags: MessageFlags.Ephemeral }).catch(() => {});
     return;
   }
+  if (decision.conflict) {
+    await interaction.followUp({ content: `**${decision.conflict.date} ${decision.conflict.room}**은 이미 승인된 예약이 있어요.`, flags: MessageFlags.Ephemeral }).catch(() => {});
+    return;
+  }
 
   const reservation = decision.reservation;
   if (reservation.status === 'approved') await createReservationCalendarEvent(interaction.guildId, reservation);
@@ -172,9 +184,6 @@ async function finishReservationDecision(interaction, decision) {
   await refreshStatusBoard(interaction.client, interaction.guildId).catch((err) => log('error', '현황판 갱신 실패:', err.message));
 }
 
-// 구글 캘린더 색상: 2층 토마토(빨강), 3층 탠저린(브라운), 4층 바질(초록)
-const ROOM_CALENDAR_COLORS = { '2층': '11', '3층': '6', '4층': '10' };
-
 async function createReservationCalendarEvent(guildId, reservation) {
   let eventId = null;
   try {
@@ -182,7 +191,6 @@ async function createReservationCalendarEvent(guildId, reservation) {
       date: reservation.date,
       summary: `[${reservation.room}] ${reservation.purpose}`,
       description: `신청자: ${reservation.userName}\n회의 인원: ${participantsOf(reservation).length}\n명단: ${participantList(reservation, 4000)}\n\n${reservation.purpose}`,
-      colorId: ROOM_CALENDAR_COLORS[reservation.room],
     });
   } catch (err) {
     log('error', '캘린더 등록 실패 (예약은 승인됨):', err.message);
@@ -309,8 +317,11 @@ export function refreshStatusBoard(client, guildId) {
     const month = currentMonthKst();
     const [year, monthNum] = month.split('-').map(Number);
     const allReservations = await getReservations(guildId);
-    const monthReservations = allReservations.filter((r) => r.date.startsWith(month));
+    const reservations = allReservations.filter((r) => r.date.startsWith(month));
     const weekStart = currentWeekStartKst();
+    const monthFile = new AttachmentBuilder(renderMonthImage(reservations, year, monthNum), { name: 'meeting-rooms-month.png' });
+    const weekFile = new AttachmentBuilder(renderWeekImage(allReservations, weekStart), { name: 'meeting-rooms-week.png' });
+    const components = [roomStatusButtons(weekStart)];
 
     let channel;
     try {
@@ -319,51 +330,29 @@ export function refreshStatusBoard(client, guildId) {
       return;
     }
 
-    // 예전 통합 메시지(이미지 2장짜리)는 한 번 지우고 분리 메시지로 전환
-    if (board.messageId) {
+    let messageId = board.messageId ?? null;
+    if (messageId) {
       try {
-        const legacy = await channel.messages.fetch(board.messageId);
-        await legacy.delete();
+        const message = await channel.messages.fetch(messageId);
+        await message.edit({ content: '', files: [monthFile, weekFile], attachments: [], components });
       } catch {
+        messageId = null;
       }
     }
-
-    const monthFile = new AttachmentBuilder(renderMonthImage(monthReservations, year, monthNum), { name: 'meeting-rooms-month.png' });
-    const weekFile = new AttachmentBuilder(renderWeekImage(allReservations, weekStart), { name: 'meeting-rooms-week.png' });
-
-    const monthMessageId = await upsertBoardMessage(channel, board.monthMessageId, monthFile);
-    const weekMessageId = await upsertBoardMessage(channel, board.weekMessageId, weekFile);
+    if (!messageId) {
+      const sent = await channel.send({ files: [monthFile, weekFile], components });
+      messageId = sent.id;
+    }
 
     await updateSettings(guildId, (s) => {
       const b = s.channels?.['회의실'];
       if (b && b.channelId === board.channelId) {
-        delete b.messageId;
-        if (monthMessageId) b.monthMessageId = monthMessageId;
-        if (weekMessageId) b.weekMessageId = weekMessageId;
+        b.messageId = messageId;
         b.lastRenderedMonth = month;
         b.lastRenderedWeek = weekStart;
       }
     });
   });
-}
-
-async function upsertBoardMessage(channel, messageId, file) {
-  if (messageId) {
-    try {
-      const message = await channel.messages.fetch(messageId);
-      await message.edit({ content: '', files: [file], attachments: [] });
-      return messageId;
-    } catch {
-      // 메시지가 지워졌으면 아래에서 새로 게시
-    }
-  }
-  try {
-    const sent = await channel.send({ files: [file] });
-    return sent.id;
-  } catch (err) {
-    log('error', '현황판 메시지 게시 실패:', err.message);
-    return null;
-  }
 }
 
 export async function refreshAllStatusBoards(client) {

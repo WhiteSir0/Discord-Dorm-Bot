@@ -71,7 +71,7 @@ export async function handleLearningVideoModal(interaction) {
     components: [row],
   });
   if (post) {
-    await attachVideoRequestMessage(interaction.guildId, request.id, post.channelId, post.messageId);
+    await attachVideoRequestMessage(interaction.guildId, request.id, post.channelId, post.messageId, post.discussionThreadId);
     await interaction.reply({ content: `신청글을 <#${post.channelId}>에 등록했습니다.`, flags: MessageFlags.Ephemeral });
   } else {
     await interaction.reply({ embeds: [videoRequestEmbed(request)], components: [row] });

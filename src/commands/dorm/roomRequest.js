@@ -120,7 +120,6 @@ export async function handleRoomParticipantConfirm(interaction) {
     });
     if (post) {
       await attachRequestMessage(interaction.guildId, result.reservation.id, post.channelId, post.messageId, post.discussionThreadId);
-      await interaction.followUp({ content: `신청 스레드를 <#${post.discussionThreadId}>에 만들었습니다.`, flags: MessageFlags.Ephemeral });
     } else {
       const sent = await interaction.followUp({ embeds: [requestEmbed(result.reservation)], components: [row], fetchReply: true });
       await attachRequestMessage(interaction.guildId, result.reservation.id, sent.channelId, sent.id);

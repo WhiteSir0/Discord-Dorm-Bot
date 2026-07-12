@@ -1,4 +1,5 @@
 import { AttachmentBuilder, EmbedBuilder } from 'discord.js';
+import { createCanvas, loadImage } from 'canvas';
 import { fileURLToPath } from 'node:url';
 
 const imagePath = fileURLToPath(new URL('../../assets/teto-chibi.png', import.meta.url));
@@ -17,7 +18,7 @@ const guides = {
     description: '회의실을 사용하려면 이 채널에서 신청하세요.',
     fields: [
       { name: '신청', value: '`/회의실신청`\n회의실, 날짜, 목적을 적고 함께 쓸 사람을 선택하세요.' },
-      { name: '취소', value: '`/회의실취소`\n승인 전이나 승인 후 모두 같은 명령어로 취소할 수 있어요.' },
+      { name: '취소', value: '승인 전에는 신청 글의 `신청 취소` 버튼을 누르세요.' },
       { name: '처음이라면', value: '먼저 `/학번등록`으로 학번, 이름, 호실을 등록하세요.' },
     ],
   },
@@ -40,6 +41,83 @@ const guides = {
   },
 };
 
+function wrapText(ctx, text, maxWidth) {
+  const lines = [];
+  let line = '';
+  for (const word of text.split(' ')) {
+    const candidate = line ? `${line} ${word}` : word;
+    if (ctx.measureText(candidate).width <= maxWidth) {
+      line = candidate;
+    } else {
+      if (line) lines.push(line);
+      line = word;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+export async function renderChannelGuide(type) {
+  const guide = guides[type];
+  if (!guide) return null;
+
+  const canvas = createCanvas(1200, 630);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff8fa';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = '#f3d8df';
+  ctx.lineWidth = 2;
+  for (let x = 0; x <= canvas.width; x += 60) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, canvas.height);
+    ctx.stroke();
+  }
+  for (let y = 0; y <= canvas.height; y += 60) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(canvas.width, y);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = '#211d26';
+  ctx.fillRect(0, 0, 1200, 86);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '700 28px sans-serif';
+  ctx.fillText('기숙사 봇', 64, 55);
+  ctx.fillStyle = '#e05278';
+  ctx.fillRect(64, 126, 72, 7);
+  ctx.fillStyle = '#211d26';
+  ctx.font = '700 56px sans-serif';
+  ctx.fillText(guide.title, 64, 202);
+  ctx.fillStyle = '#6e6570';
+  ctx.font = '26px sans-serif';
+  ctx.fillText(guide.description, 64, 248);
+
+  let y = 318;
+  for (const field of guide.fields.slice(0, 3)) {
+    ctx.fillStyle = '#d94f75';
+    ctx.font = '700 25px sans-serif';
+    ctx.fillText(field.name, 64, y);
+    ctx.fillStyle = '#302b33';
+    ctx.font = '23px sans-serif';
+    const plain = field.value.replaceAll('`', '').replaceAll('\n', ' · ');
+    for (const line of wrapText(ctx, plain, 690).slice(0, 2)) {
+      y += 34;
+      ctx.fillText(line, 64, y);
+    }
+    y += 42;
+  }
+
+  const teto = await loadImage(imagePath);
+  const size = 350;
+  ctx.drawImage(teto, 805, 205, size, size);
+  ctx.fillStyle = '#211d26';
+  ctx.font = '700 22px sans-serif';
+  ctx.fillText('모르면 /도움말', 928, 585);
+  return canvas.toBuffer('image/png');
+}
+
 export async function sendChannelGuide(channel, type) {
   const guide = guides[type];
   if (!guide || !channel?.isTextBased()) return null;
@@ -55,5 +133,13 @@ export async function sendChannelGuide(channel, type) {
     .setThumbnail('attachment://teto-guide.png')
     .setFooter({ text: '모르면 /도움말' });
 
-  return channel.send({ embeds: [embed], files: [image], allowedMentions: { parse: [] } });
+  const embedMessage = await channel.send({ embeds: [embed], files: [image], allowedMentions: { parse: [] } });
+  const guideImage = await renderChannelGuide(type);
+  if (guideImage) {
+    await channel.send({
+      files: [new AttachmentBuilder(guideImage, { name: `${type}-guide.png` })],
+      allowedMentions: { parse: [] },
+    });
+  }
+  return embedMessage;
 }

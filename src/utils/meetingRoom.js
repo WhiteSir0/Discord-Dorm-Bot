@@ -109,6 +109,12 @@ export function requestEmbed(reservation) {
 
 export async function handleReservationButton(interaction) {
   const [, action, id] = interaction.customId.split(':');
+  if (action === 'withdraw') {
+    await interaction.deferUpdate();
+    const decision = await withdrawReservation(interaction, id);
+    await finishReservationDecision(interaction, decision);
+    return;
+  }
   if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
     await interaction.reply({ content: '자치회 인원이 아닙니다.', flags: MessageFlags.Ephemeral });
     return;
@@ -145,7 +151,7 @@ export async function handleReservationRejectionModal(interaction) {
   await finishReservationDecision(interaction, decision);
 }
 
-async function decideReservation(interaction, id, status, rejectionReason = null) {
+export async function decideReservation(interaction, id, status, rejectionReason = null) {
   const decision = await updateReservations(interaction.guildId, (list) => {
     const reservation = list.find((item) => item.id === id);
     if (!reservation) return { missing: true };
@@ -157,9 +163,35 @@ async function decideReservation(interaction, id, status, rejectionReason = null
     reservation.decidedByName = serverDisplayName(interaction);
     reservation.decidedAt = new Date().toISOString();
     if (rejectionReason) reservation.rejectionReason = rejectionReason;
-    return { reservation: { ...reservation } };
+    const autoRejected = [];
+    if (status === 'approved') {
+      for (const item of list) {
+        if (item.id === id || item.room !== reservation.room || item.date !== reservation.date || item.status !== 'pending') continue;
+        item.status = 'rejected';
+        item.decidedBy = interaction.user.id;
+        item.decidedByName = serverDisplayName(interaction);
+        item.decidedAt = reservation.decidedAt;
+        item.rejectionReason = '같은 날짜와 회의실의 다른 신청이 승인됨';
+        autoRejected.push({ ...item });
+      }
+    }
+    return { reservation: { ...reservation }, autoRejected };
   });
   return decision;
+}
+
+export async function withdrawReservation(interaction, id) {
+  return updateReservations(interaction.guildId, (list) => {
+    const reservation = list.find((item) => item.id === id);
+    if (!reservation) return { missing: true };
+    if (reservation.userId !== interaction.user.id) return { forbidden: true };
+    if (reservation.status !== 'pending') return { already: reservation.status };
+    reservation.status = 'cancelled';
+    reservation.cancelledBy = interaction.user.id;
+    reservation.cancelledByName = serverDisplayName(interaction);
+    reservation.cancelledAt = new Date().toISOString();
+    return { reservation: { ...reservation }, withdrawn: true };
+  });
 }
 
 async function finishReservationDecision(interaction, decision) {
@@ -171,6 +203,10 @@ async function finishReservationDecision(interaction, decision) {
     await interaction.followUp({ content: `이미 처리된 신청이에요 (${statusLabel(decision.already)}).`, flags: MessageFlags.Ephemeral }).catch(() => {});
     return;
   }
+  if (decision.forbidden) {
+    await interaction.followUp({ content: '신청한 사람만 취소할 수 있어요.', flags: MessageFlags.Ephemeral }).catch(() => {});
+    return;
+  }
   if (decision.conflict) {
     await interaction.followUp({ content: `**${decision.conflict.date} ${decision.conflict.room}**은 이미 승인된 예약이 있어요.`, flags: MessageFlags.Ephemeral }).catch(() => {});
     return;
@@ -180,10 +216,22 @@ async function finishReservationDecision(interaction, decision) {
   if (reservation.status === 'approved') await createReservationCalendarEvent(interaction.guildId, reservation);
   await addPrivateThreadMember(interaction.client, reservation.discussionThreadId, interaction.user.id);
   await updateReservationRequestMessage(interaction.client, reservation);
-  const notice = reservation.status === 'approved'
+  const notice = decision.withdrawn
+    ? `<@${reservation.userId}> 회의실 신청을 취소했습니다.`
+    : reservation.status === 'approved'
     ? `<@${reservation.userId}> 회의실 사용 신청이 승인되었습니다.\n처리: <@${reservation.decidedBy}>`
     : `<@${reservation.userId}> 회의실 사용 신청이 거절되었습니다.\n사유: ${reservation.rejectionReason}\n처리: <@${reservation.decidedBy}>`;
   await sendDecisionNotice(interaction.client, reservation.discussionThreadId ?? reservation.requestChannelId, notice, reservation.userId);
+  for (const rejected of decision.autoRejected ?? []) {
+    await addPrivateThreadMember(interaction.client, rejected.discussionThreadId, interaction.user.id);
+    await updateReservationRequestMessage(interaction.client, rejected);
+    await sendDecisionNotice(
+      interaction.client,
+      rejected.discussionThreadId ?? rejected.requestChannelId,
+      `<@${rejected.userId}> 회의실 사용 신청이 자동으로 거절되었습니다.\n사유: ${rejected.rejectionReason}\n처리: <@${rejected.decidedBy}>`,
+      rejected.userId,
+    );
+  }
   await refreshAllStatusBoards(interaction.client).catch((err) => log('error', '현황판 갱신 실패:', err.message));
 }
 

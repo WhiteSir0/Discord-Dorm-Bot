@@ -119,6 +119,7 @@ export async function handleRoomParticipantConfirm(interaction) {
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`mr:approve:${result.reservation.id}`).setLabel('승인').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId(`mr:reject:${result.reservation.id}`).setLabel('거절').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`mr:withdraw:${result.reservation.id}`).setLabel('신청 취소').setStyle(ButtonStyle.Secondary),
   );
   await interaction.update({ content: '회의실 신청을 등록했습니다.', components: [] });
   try {

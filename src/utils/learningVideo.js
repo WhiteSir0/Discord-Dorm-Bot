@@ -117,6 +117,12 @@ export function videoRequestEmbed(request) {
 
 export async function handleVideoRequestButton(interaction) {
   const [, action, id] = interaction.customId.split(':');
+  if (action === 'withdraw') {
+    await interaction.deferUpdate();
+    const decision = await withdrawVideoRequest(interaction, id);
+    await finishVideoDecision(interaction, decision);
+    return;
+  }
   if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
     await interaction.reply({ content: '자치회 인원이 아닙니다.', flags: MessageFlags.Ephemeral });
     return;
@@ -166,6 +172,20 @@ async function decideVideoRequest(interaction, id, status, rejectionReason = nul
   });
 }
 
+export async function withdrawVideoRequest(interaction, id) {
+  return updateJson(requestsPath(interaction.guildId), [], (requests) => {
+    const request = requests.find((item) => item.id === id);
+    if (!request) return { missing: true };
+    if (request.userId !== interaction.user.id) return { forbidden: true };
+    if (request.status !== 'pending') return { already: request.status };
+    request.status = 'cancelled';
+    request.cancelledBy = interaction.user.id;
+    request.cancelledByName = serverDisplayName(interaction);
+    request.cancelledAt = new Date().toISOString();
+    return { request: { ...request }, withdrawn: true };
+  });
+}
+
 async function finishVideoDecision(interaction, decision) {
   if (decision.missing) {
     await interaction.followUp({ content: '해당 신청을 찾을 수 없어요.', flags: MessageFlags.Ephemeral }).catch(() => {});
@@ -175,11 +195,17 @@ async function finishVideoDecision(interaction, decision) {
     await interaction.followUp({ content: '이미 처리된 신청이에요.', flags: MessageFlags.Ephemeral }).catch(() => {});
     return;
   }
+  if (decision.forbidden) {
+    await interaction.followUp({ content: '신청한 사람만 취소할 수 있어요.', flags: MessageFlags.Ephemeral }).catch(() => {});
+    return;
+  }
 
   const request = decision.request;
   await addPrivateThreadMember(interaction.client, request.discussionThreadId, interaction.user.id);
   await updateVideoRequestMessage(interaction.client, request);
-  const notice = request.status === 'approved'
+  const notice = decision.withdrawn
+    ? `<@${request.userId}> 학습 영상 신청을 취소했습니다.`
+    : request.status === 'approved'
     ? `<@${request.userId}> 확인했습니다. 관리실에서 머리띠 받아가세요.\n처리: <@${request.decidedBy}>`
     : `<@${request.userId}> 학습 영상 신청이 거절되었습니다.\n사유: ${request.rejectionReason}\n처리: <@${request.decidedBy}>`;
   await sendDecisionNotice(interaction.client, request.discussionThreadId ?? request.requestChannelId, notice, request.userId);
@@ -191,17 +217,19 @@ async function updateVideoRequestMessage(client, request) {
   const message = await channel?.messages.fetch(request.requestMessageId).catch(() => null);
   if (!message?.embeds[0]) return;
   const approved = request.status === 'approved';
+  const cancelled = request.status === 'cancelled';
+  const actorName = request.decidedByName ?? request.cancelledByName;
   const embed = EmbedBuilder.from(message.embeds[0])
-    .setColor(approved ? 0x3ba55d : 0xd83c3e)
-    .setFooter({ text: `${approved ? '승인됨' : '거절됨'} · 처리: ${request.decidedByName}` });
+    .setColor(approved ? 0x3ba55d : cancelled ? 0x99aab5 : 0xd83c3e)
+    .setFooter({ text: `${approved ? '승인됨' : cancelled ? '취소됨' : '거절됨'} · 처리: ${actorName}` });
   if (request.rejectionReason) embed.addFields({ name: '거절 사유', value: request.rejectionReason });
   const components = request.discussionThreadId ? [privateThreadLinkRow(message.guildId, request.discussionThreadId)] : [];
   await message.edit({ embeds: [embed], components }).catch(() => {});
   const threadMessage = await findPrivateThreadRequestMessage(client, request.discussionThreadId, request.id);
   if (threadMessage?.embeds[0]) {
     const threadEmbed = EmbedBuilder.from(threadMessage.embeds[0])
-      .setColor(approved ? 0x3ba55d : 0xd83c3e)
-      .setFooter({ text: `${approved ? '승인됨' : '거절됨'} · 처리: ${request.decidedByName}` });
+      .setColor(approved ? 0x3ba55d : cancelled ? 0x99aab5 : 0xd83c3e)
+      .setFooter({ text: `${approved ? '승인됨' : cancelled ? '취소됨' : '거절됨'} · 처리: ${actorName}` });
     if (request.rejectionReason) threadEmbed.addFields({ name: '거절 사유', value: request.rejectionReason });
     const previews = threadMessage.embeds.slice(1).map((preview) => EmbedBuilder.from(preview));
     await threadMessage.edit({ embeds: [threadEmbed, ...previews], components: [] }).catch(() => {});

@@ -71,6 +71,7 @@ export async function handleLearningVideoModal(interaction) {
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`lv:approve:${request.id}`).setLabel('승인').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId(`lv:reject:${request.id}`).setLabel('거절').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`lv:withdraw:${request.id}`).setLabel('신청 취소').setStyle(ButtonStyle.Secondary),
   );
   const embed = videoRequestEmbed(request);
   const previewUrls = videoReferenceLinks(request);

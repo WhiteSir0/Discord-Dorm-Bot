@@ -4,13 +4,14 @@ import { fileURLToPath } from 'node:url';
 
 const imagePath = fileURLToPath(new URL('../../assets/teto-chibi.png', import.meta.url));
 
-const guides = {
+export const guides = {
   회의실: {
     title: '회의실 현황',
-    description: '월간·주간 예약 현황이 이 채널에 올라와요.',
+    description: '회의실 이용 전에 아래 내용을 확인하세요.',
     fields: [
-      { name: '자세히 보기', value: '사진 아래 요일 버튼을 누르거나 `/회의실현황`을 사용하세요.' },
-      { name: '날짜 입력', value: '`/회의실현황 날짜:07-15`\n날짜를 비우면 오늘 현황이 보여요.' },
+      { name: '이용 시간', value: '오전 10시 ~ 오후 11시 50분' },
+      { name: '이용 규칙', value: '혼성 팀은 4층 회의실만 이용할 수 있어요.\n다른 학생에게 피해가 가지 않도록 큰소리를 자제해주세요.' },
+      { name: '주의', value: '승인 전에는 회의실을 사용할 수 없어요.\n사전 연락 없이 전원 노쇼 시 팀 전원에게 벌점이 부여됩니다.' },
     ],
   },
   회의실신청: {
@@ -52,18 +53,24 @@ const guides = {
 
 function wrapText(ctx, text, maxWidth) {
   const lines = [];
-  let line = '';
-  for (const word of text.split(' ')) {
-    const candidate = line ? `${line} ${word}` : word;
-    if (ctx.measureText(candidate).width <= maxWidth) {
-      line = candidate;
-    } else {
-      if (line) lines.push(line);
-      line = word;
+  for (const paragraph of text.split('\n')) {
+    let line = '';
+    for (const word of paragraph.split(' ')) {
+      const candidate = line ? `${line} ${word}` : word;
+      if (ctx.measureText(candidate).width <= maxWidth) {
+        line = candidate;
+      } else {
+        if (line) lines.push(line);
+        line = word;
+      }
     }
+    if (line) lines.push(line);
   }
-  if (line) lines.push(line);
   return lines;
+}
+
+export function getGuideFieldLines(ctx, field, maxWidth = 690) {
+  return wrapText(ctx, field.value.replaceAll('`', ''), maxWidth).slice(0, 2);
 }
 
 export async function renderChannelGuide(type) {
@@ -110,8 +117,7 @@ export async function renderChannelGuide(type) {
     ctx.fillText(field.name, 64, y);
     ctx.fillStyle = '#302b33';
     ctx.font = '23px sans-serif';
-    const plain = field.value.replaceAll('`', '').replaceAll('\n', ' · ');
-    for (const line of wrapText(ctx, plain, 690).slice(0, 2)) {
+    for (const line of getGuideFieldLines(ctx, field)) {
       y += 34;
       ctx.fillText(line, 64, y);
     }

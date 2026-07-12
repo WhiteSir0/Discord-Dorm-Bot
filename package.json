@@ -9,8 +9,7 @@
   },
   "scripts": {
     "start": "node src/index.js",
-    "deploy": "node scripts/deploy-commands.js",
-    "test": "node --test --test-concurrency=1"
+    "deploy": "node scripts/deploy-commands.js"
   },
   "dependencies": {
     "canvas": "^3.1.2",

@@ -269,7 +269,7 @@ async function createReservationCalendarEvent(guildId, reservation) {
   if (!kept) await deleteEvent(eventId).catch((err) => log('error', '취소된 예약의 캘린더 정리 실패:', err.message));
 }
 
-async function updateReservationRequestMessage(client, reservation) {
+export async function updateReservationRequestMessage(client, reservation) {
   if (!reservation.requestChannelId || !reservation.requestMessageId) return;
   const channel = await client.channels.fetch(reservation.requestChannelId).catch(() => null);
   const message = await channel?.messages.fetch(reservation.requestMessageId).catch(() => null);
@@ -280,6 +280,7 @@ async function updateReservationRequestMessage(client, reservation) {
     .setColor(approved ? 0x3ba55d : reservation.status === 'cancelled' ? 0x99aab5 : 0xd83c3e)
     .setFooter({ text: `${statusLabel(reservation.status)} · 처리: ${actorName}` });
   if (reservation.rejectionReason) embed.addFields({ name: '거절 사유', value: reservation.rejectionReason });
+  if (reservation.cancellationReason) embed.addFields({ name: '취소 사유', value: reservation.cancellationReason });
   const components = reservation.discussionThreadId ? [privateThreadLinkRow(message.guildId, reservation.discussionThreadId)] : [];
   await message.edit({ embeds: [embed], components }).catch(() => {});
   const threadMessage = await findPrivateThreadRequestMessage(client, reservation.discussionThreadId, reservation.id);
@@ -288,6 +289,7 @@ async function updateReservationRequestMessage(client, reservation) {
       .setColor(approved ? 0x3ba55d : reservation.status === 'cancelled' ? 0x99aab5 : 0xd83c3e)
       .setFooter({ text: `${statusLabel(reservation.status)} · 처리: ${actorName}` });
     if (reservation.rejectionReason) threadEmbed.addFields({ name: '거절 사유', value: reservation.rejectionReason });
+    if (reservation.cancellationReason) threadEmbed.addFields({ name: '취소 사유', value: reservation.cancellationReason });
     const previews = threadMessage.embeds.slice(1).map((preview) => EmbedBuilder.from(preview));
     await threadMessage.edit({ embeds: [threadEmbed, ...previews], components: [] }).catch(() => {});
   }
@@ -339,9 +341,9 @@ export async function syncAllCalendarEvents(client) {
   }
 }
 
-export async function cancelReservation(guildId, { room, date, requesterId, isAdmin }) {
+export async function cancelReservation(guildId, { room, date, requesterId, requesterName, reason, isAdmin }) {
   const result = await updateReservations(guildId, (list) => {
-    const r = list.find((x) => x.guildId === guildId && x.room === room && x.date === date && isActive(x));
+    const r = list.find((x) => (isAdmin || x.guildId === guildId) && x.room === room && x.date === date && isActive(x));
     if (!r) return { ok: false, reason: '해당 날짜에 그 회의실 예약이 없어요.' };
     if (r.userId !== requesterId && !isAdmin) {
       return { ok: false, reason: '본인 예약이거나 관리자만 취소할 수 있어요.' };
@@ -349,6 +351,8 @@ export async function cancelReservation(guildId, { room, date, requesterId, isAd
     r.status = 'cancelled';
     r.cancelledAt = new Date().toISOString();
     r.cancelledBy = requesterId;
+    r.cancelledByName = requesterName;
+    r.cancellationReason = reason;
     return { ok: true, reservation: { ...r } };
   });
 

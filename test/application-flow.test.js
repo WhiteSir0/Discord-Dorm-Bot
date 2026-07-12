@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
-import { createReservation, decideReservation, getReservations, withdrawReservation } from '../src/utils/meetingRoom.js';
+import { cancelReservation, createReservation, decideReservation, getReservations, withdrawReservation } from '../src/utils/meetingRoom.js';
 import { createVideoRequest, getVideoRequests, withdrawVideoRequest } from '../src/utils/learningVideo.js';
-import { renderChannelGuide } from '../src/utils/channelGuide.js';
+import { sendChannelGuide } from '../src/utils/channelGuide.js';
 
 const interaction = (userId = 'admin') => ({
   guildId: 'guild-a',
@@ -53,9 +53,36 @@ test('회의실과 학습 영상 신청은 신청자만 승인 전에 취소한�
   assert.equal((await getVideoRequests('guild-a'))[0].status, 'cancelled');
 });
 
-test('채널 안내 이미지를 PNG로 만든다', async () => {
-  const image = await renderChannelGuide('회의실신청');
+test('채널 안내는 임베드 없이 PNG 한 장만 보낸다', async () => {
+  let payload;
+  const channel = {
+    isTextBased: () => true,
+    send: async (value) => {
+      payload = value;
+      return { id: 'message' };
+    },
+  };
 
+  await sendChannelGuide(channel, '회의실신청');
+  const image = payload.files[0].attachment;
+
+  assert.equal(payload.embeds, undefined);
+  assert.equal(payload.files.length, 1);
   assert.equal(image.subarray(1, 4).toString(), 'PNG');
   assert.ok(image.length > 20_000);
+});
+
+test('관리자는 다른 서버에서 만든 회의실 예약도 사유와 함께 취소한다', async () => {
+  await createReservation('guild-b', {
+    room: '4층 회의실_2', date: '2026-07-22', purpose: '회의', userId: 'user-b', userName: '10102 김철수', requesterDisplayName: '김철수', participants: [],
+  });
+
+  const result = await cancelReservation('guild-a', {
+    room: '4층 회의실_2', date: '2026-07-22', requesterId: 'admin', requesterName: '관리자', reason: '시설 점검', isAdmin: true,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.reservation.status, 'cancelled');
+  assert.equal(result.reservation.cancellationReason, '시설 점검');
+  assert.equal(result.reservation.cancelledByName, '관리자');
 });

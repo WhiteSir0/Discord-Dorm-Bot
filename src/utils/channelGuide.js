@@ -1,4 +1,4 @@
-import { AttachmentBuilder, EmbedBuilder } from 'discord.js';
+import { AttachmentBuilder } from 'discord.js';
 import { createCanvas, loadImage } from 'canvas';
 import { fileURLToPath } from 'node:url';
 
@@ -122,24 +122,10 @@ export async function sendChannelGuide(channel, type) {
   const guide = guides[type];
   if (!guide || !channel?.isTextBased()) return null;
 
-  const image = new AttachmentBuilder(imagePath, { name: 'teto-guide.png' });
-  const embed = new EmbedBuilder()
-    .setColor(0xd95377)
-    .setAuthor({ name: '기숙사 봇' })
-    .setTitle(guide.title)
-    .setURL('https://siru-archive.kr/teto-bot/')
-    .setDescription(guide.description)
-    .addFields(guide.fields)
-    .setThumbnail('attachment://teto-guide.png')
-    .setFooter({ text: '모르면 /도움말' });
-
-  const embedMessage = await channel.send({ embeds: [embed], files: [image], allowedMentions: { parse: [] } });
   const guideImage = await renderChannelGuide(type);
-  if (guideImage) {
-    await channel.send({
-      files: [new AttachmentBuilder(guideImage, { name: `${type}-guide.png` })],
-      allowedMentions: { parse: [] },
-    });
-  }
-  return embedMessage;
+  if (!guideImage) return null;
+  return channel.send({
+    files: [new AttachmentBuilder(guideImage, { name: `${type}-guide.png` })],
+    allowedMentions: { parse: [] },
+  });
 }

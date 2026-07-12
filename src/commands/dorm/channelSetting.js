@@ -18,6 +18,7 @@ export default {
           { name: '회의실 현황', value: '회의실' },
           { name: '회의실 신청 채널', value: '회의실신청' },
           { name: '연장 신청 채널', value: '연장신청' },
+          { name: '잔류 신청 채널', value: '잔류신청' },
           { name: '학습 영상 신청 채널', value: '학습영상신청' },
         ),
     ),

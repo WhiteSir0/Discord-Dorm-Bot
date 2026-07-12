@@ -3,6 +3,7 @@ import { log } from '../utils/logger.js';
 import { refreshAllStatusBoards, startDailyRefresh, syncAllCalendarEvents } from '../utils/meetingRoom.js';
 import { logCalendarState } from '../utils/gcal.js';
 import { startBotPresence } from '../utils/botPresence.js';
+import { restoreApplicationTimers } from '../utils/applicationTimers.js';
 
 export default {
   name: Events.ClientReady,
@@ -18,5 +19,6 @@ export default {
     }
     await refreshAllStatusBoards(client, { skipUnchanged: true });
     startDailyRefresh(client);
+    await restoreApplicationTimers(client);
   },
 };

@@ -23,7 +23,7 @@ export function currentExtensionWeek() {
   };
 }
 
-export function startExtensionApplication(guildId) {
+export function startExtensionApplication(guildId, durationMinutes = null) {
   const week = currentExtensionWeek();
   return updateJson(applicationsPath(guildId), { applications: [] }, (data) => {
     const active = data.applications.find((application) => application.status === 'active');
@@ -41,6 +41,7 @@ export function startExtensionApplication(guildId) {
       excludedDays: [],
       entries: Object.fromEntries(EXTENSION_DAYS.map((day) => [day.key, []])),
       createdAt: new Date().toISOString(),
+      closesAt: durationMinutes ? new Date(Date.now() + durationMinutes * 60_000).toISOString() : null,
     };
     data.applications.push(application);
     return { application, previous: active ?? null, existing: false };
@@ -150,10 +151,13 @@ export function toggleExtensionDayExclusion(guildId, id, dayKey) {
 }
 
 export function extensionEmbed(application) {
+  const deadline = application.closesAt
+    ? `\n자동 종료: <t:${Math.floor(new Date(application.closesAt).getTime() / 1000)}:R>`
+    : '';
   return new EmbedBuilder()
     .setTitle(`${application.label} 연장 신청`)
     .setColor(application.status === 'active' ? 0x5865f2 : 0xd83c3e)
-    .setDescription('월요일부터 목요일 중 최대 2일을 선택할 수 있습니다. 같은 요일을 다시 누르면 취소됩니다.')
+    .setDescription(`월요일부터 목요일 중 최대 2일을 선택할 수 있습니다. 같은 요일을 다시 누르면 취소됩니다.${deadline}`)
     .addFields(EXTENSION_DAYS.map((day) => ({
       name: day.label,
       value: application.excludedDays?.includes(day.key)

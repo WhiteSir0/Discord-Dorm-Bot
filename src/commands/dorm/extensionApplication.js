@@ -1,6 +1,7 @@
 import { AttachmentBuilder, InteractionContextType, MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { getSettings } from '../../utils/meetingRoom.js';
 import { extensionButtons, extensionControlButtons, extensionEmbed, extensionResultCsv, getLatestExtensionApplication, setExtensionMessage, startExtensionApplication } from '../../utils/extensionApplication.js';
+import { scheduleExtensionClose } from '../../utils/applicationTimers.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -8,7 +9,13 @@ export default {
     .setDescription('주차별 연장 신청을 시작합니다.')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .setContexts(InteractionContextType.Guild)
-    .addSubcommand((subcommand) => subcommand.setName('시작').setDescription('이번 주 연장 신청을 시작합니다.'))
+    .addSubcommand((subcommand) => subcommand
+      .setName('시작')
+      .setDescription('이번 주 연장 신청을 시작합니다.')
+      .addIntegerOption((option) => option
+        .setName('시간')
+        .setDescription('자동 종료까지의 시간(분). 비우면 수동 종료합니다.')
+        .setMinValue(1)))
     .addSubcommand((subcommand) => subcommand.setName('결과').setDescription('최근 연장 신청 결과를 CSV 파일로 받습니다.')),
 
   async execute(interaction) {
@@ -45,7 +52,8 @@ export default {
       return;
     }
 
-    const result = await startExtensionApplication(interaction.guildId);
+    const durationMinutes = interaction.options.getInteger('시간');
+    const result = await startExtensionApplication(interaction.guildId, durationMinutes);
     if (result.existing) {
       const location = result.application.channelId ? `<#${result.application.channelId}>` : '현재 채널';
       await interaction.reply({ content: `이미 ${result.application.label} 연장 신청이 진행 중이에요: ${location}`, flags: MessageFlags.Ephemeral });
@@ -67,5 +75,7 @@ export default {
     await interaction.reply(payload);
     const message = await interaction.fetchReply();
     await setExtensionMessage(interaction.guildId, result.application.id, message.channelId, message.id);
+    Object.assign(result.application, { channelId: message.channelId, messageId: message.id });
+    scheduleExtensionClose(interaction.client, interaction.guildId, result.application);
   },
 };

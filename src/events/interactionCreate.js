@@ -6,10 +6,20 @@ import { handleRoomParticipantCancel, handleRoomParticipantConfirm, handleRoomPa
 import { handleLearningVideoModal } from '../commands/dorm/learningVideoRequest.js';
 import { handleExtensionButton } from '../utils/extensionInteraction.js';
 import { handleRoomStatusButton } from '../commands/dorm/roomStatus.js';
+import { handleStayButton } from '../utils/stayInteraction.js';
 
 export default {
   name: Events.InteractionCreate,
   async execute(interaction) {
+    if (interaction.isButton() && interaction.customId.startsWith('stay:')) {
+      try {
+        await handleStayButton(interaction);
+      } catch (err) {
+        log('error', '잔류 신청 버튼 처리 오류:', err);
+      }
+      return;
+    }
+
     if (interaction.isButton() && interaction.customId.startsWith('ex:')) {
       try {
         await handleExtensionButton(interaction);

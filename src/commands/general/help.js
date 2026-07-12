@@ -30,7 +30,8 @@ function buildHelpEmbed(client) {
   return new EmbedBuilder()
     .setTitle('📖 명령어 목록')
     .setDescription(lines.join('\n') || '등록된 명령어가 없습니다.')
-    .setColor(0x5865f2);
+    .setColor(0x5865f2)
+    .setFooter({ text: '제작: WhiteSir0 · github.com/WhiteSir0/Discord-Dorm-Bot' });
 }
 
 export default {

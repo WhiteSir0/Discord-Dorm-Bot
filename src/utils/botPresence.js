@@ -26,7 +26,6 @@ const TRACKS = [
   'Ultra Trailer - Masarada feat. Kasane Teto',
   'YABABAINA - SatapanP feat. Hatsune Miku, Kasane Teto & Zundamon',
   'DAI DAI DAI KIRAI - Kasane Teto',
-  'Loop the Room - Tokyo Manaka feat. Kasane Teto',
   'Doomer - Tokyo Manaka feat. Kasane Teto',
   'Liar Macaron - Kasane Teto',
   'Obsolete Meat - Kasane Teto',
@@ -47,6 +46,9 @@ const TRACKS = [
   'Honestly - Kasane Teto',
   'MINIMUM RAGE - Kasane Teto',
   'Melt Ice Cream - Kasane Teto',
+  'Simulcaster - SV-side - Yoshida Yasei feat. Kasane Teto',
+  'キャラクターT - Atena feat. Kasane Teto',
+  '性格悪くてすみません。 - Aoya feat. Kasane Teto',
 ];
 
 export function startBotPresence(client) {

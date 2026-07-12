@@ -3,7 +3,7 @@ import { ActionRowBuilder, EmbedBuilder, MessageFlags, ModalBuilder, PermissionF
 import { readJson, updateJson } from './jsonStore.js';
 import { sendDecisionNotice } from './applicationForum.js';
 import { serverDisplayName } from './discordNames.js';
-import { addPrivateThreadMember, findPrivateThreadRequestMessage, privateThreadLinkRow } from './privateApplicationThread.js';
+import { addPrivateThreadMember, findPrivateThreadRequestMessage, notifyAndReleasePrivateThreadMembers, privateThreadLinkRow } from './privateApplicationThread.js';
 
 const requestsPath = (guildId) => `guilds/${guildId}/learning-videos.json`;
 
@@ -94,7 +94,7 @@ export function videoRequestEmbed(request) {
     .setTitle('학습 영상 신청')
     .setColor(0xf0b232)
     .addFields(
-      { name: '신청자', value: `<@${request.userId}>`, inline: true },
+      { name: '신청자', value: request.requesterDisplayName, inline: true },
       { name: '학습 시간', value: request.duration, inline: true },
       { name: '학습 목적', value: request.purpose, inline: true },
     )
@@ -206,9 +206,15 @@ async function finishVideoDecision(interaction, decision) {
   const notice = decision.withdrawn
     ? `<@${request.userId}> 학습 영상 신청을 취소했습니다.`
     : request.status === 'approved'
-    ? `<@${request.userId}> 확인했습니다. 관리실에서 머리띠 받아가세요.\n처리: <@${request.decidedBy}>`
-    : `<@${request.userId}> 학습 영상 신청이 거절되었습니다.\n사유: ${request.rejectionReason}\n처리: <@${request.decidedBy}>`;
-  await sendDecisionNotice(interaction.client, request.discussionThreadId ?? request.requestChannelId, notice, request.userId);
+    ? `확인했습니다. 관리실에서 머리띠 받아가세요.\n처리: <@${request.decidedBy}>`
+    : `학습 영상 신청이 거절되었습니다.\n사유: ${request.rejectionReason}\n처리: <@${request.decidedBy}>`;
+  await sendDecisionNotice(interaction.client, request.discussionThreadId ?? request.requestChannelId, notice);
+  if (!decision.withdrawn && request.userId !== request.decidedBy) {
+    const dmNotice = request.status === 'approved'
+      ? `확인했습니다. 관리실에서 머리띠 받아가세요.\n처리: ${request.decidedByName}`
+      : `학습 영상 신청이 거절되었습니다.\n사유: ${request.rejectionReason}\n처리: ${request.decidedByName}`;
+    await notifyAndReleasePrivateThreadMembers(interaction.client, request.discussionThreadId, [request.userId], dmNotice);
+  }
 }
 
 async function updateVideoRequestMessage(client, request) {

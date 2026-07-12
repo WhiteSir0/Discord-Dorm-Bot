@@ -19,7 +19,8 @@ export async function createPrivateApplicationThread(channel, guildId, payload) 
     autoArchiveDuration: 10_080,
     invitable: false,
   });
-  await thread.members.add(payload.applicantUserId);
+  const memberUserIds = [...new Set(payload.memberUserIds ?? [payload.applicantUserId])];
+  for (const userId of memberUserIds) await thread.members.add(userId);
   await thread.send({
     content: `<@${payload.applicantUserId}> 신청 관련 대화 스레드입니다.`,
     embeds: [...payload.embeds, ...(payload.previewEmbeds ?? [])],
@@ -34,6 +35,33 @@ export async function addPrivateThreadMember(client, threadId, userId) {
   if (!threadId) return;
   const thread = await client.channels.fetch(threadId).catch(() => null);
   await thread?.members?.add(userId).catch(() => {});
+}
+
+export async function releasePrivateThreadMembers(client, threadId, userIds) {
+  const thread = await client.channels.fetch(threadId).catch(() => null);
+  for (const userId of new Set(userIds)) await thread?.members?.remove(userId).catch(() => {});
+}
+
+export async function notifyAndReleasePrivateThreadMembers(client, threadId, userIds, content) {
+  const thread = await client.channels.fetch(threadId).catch(() => null);
+  const failed = [];
+  for (const userId of new Set(userIds)) {
+    const user = await client.users.fetch(userId).catch(() => null);
+    const sent = await user?.send({ content, allowedMentions: { parse: [] } }).then(() => true).catch(() => false) ?? false;
+    if (!sent) {
+      failed.push(userId);
+      continue;
+    }
+    await thread?.members?.remove(userId).catch(() => {});
+  }
+  if (failed.length && thread?.isTextBased()) {
+    if (thread.archived) await thread.setArchived(false).catch(() => {});
+    await thread.send({
+      content: `${failed.map((userId) => `<@${userId}>`).join(' ')} DM을 보낼 수 없어 이 스레드에 남겨뒀습니다.`,
+      allowedMentions: { users: failed },
+    }).catch(() => {});
+  }
+  return failed;
 }
 
 export async function findPrivateThreadRequestMessage(client, threadId, requestId) {

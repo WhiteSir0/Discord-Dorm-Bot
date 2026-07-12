@@ -111,6 +111,14 @@ export async function handleRoomParticipantConfirm(interaction) {
     participants,
   });
   if (!result.ok) {
+    if (result.participantConflict) {
+      const { participant, reservation } = result.participantConflict;
+      await interaction.update({
+        content: `**${participant.name}**님은 이미 **${reservation.date} ${reservation.room}** 신청에 포함되어 있어요.`,
+        components: [],
+      });
+      return;
+    }
     const label = result.conflict.status === 'approved' ? '이미 예약돼 있어요' : '승인 대기 중인 신청이 있어요';
     await interaction.update({ content: `**${draft.date} ${draft.room}**은 ${label} (<@${result.conflict.userId}>).`, components: [] });
     return;
@@ -128,6 +136,7 @@ export async function handleRoomParticipantConfirm(interaction) {
       embeds: [requestEmbed(result.reservation)],
       components: [row],
       applicantUserId: result.reservation.userId,
+      memberUserIds: participants.map((participant) => participant.userId),
       fallbackChannelId: interaction.channelId,
     }).catch((err) => {
       log('error', '회의실 신청 스레드 생성 실패:', err.message);

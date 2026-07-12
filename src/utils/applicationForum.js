@@ -10,9 +10,9 @@ export async function createApplicationPost(client, guildId, type, payload) {
   return createPrivateApplicationThread(channel, guildId, payload);
 }
 
-export async function sendDecisionNotice(client, channelId, content, mentionedUserId) {
+export async function sendDecisionNotice(client, channelId, content) {
   const channel = await client.channels.fetch(channelId).catch(() => null);
   if (!channel?.isTextBased()) return;
   if (channel.isThread() && channel.archived) await channel.setArchived(false).catch(() => {});
-  await channel.send({ content, allowedMentions: { users: [mentionedUserId] } }).catch(() => {});
+  await channel.send({ content, allowedMentions: { parse: [] } }).catch(() => {});
 }

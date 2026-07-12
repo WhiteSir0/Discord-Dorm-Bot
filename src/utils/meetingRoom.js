@@ -10,7 +10,7 @@ import { log } from './logger.js';
 import { sendDecisionNotice } from './applicationForum.js';
 import { serverDisplayName } from './discordNames.js';
 import { roomStatusButtons } from './roomStatusButtons.js';
-import { addPrivateThreadMember, findPrivateThreadRequestMessage, privateThreadLinkRow } from './privateApplicationThread.js';
+import { addPrivateThreadMember, findPrivateThreadRequestMessage, notifyAndReleasePrivateThreadMembers, privateThreadLinkRow, releasePrivateThreadMembers } from './privateApplicationThread.js';
 
 export const ROOM_NAMES = ROOMS.map((r) => r.name);
 
@@ -63,6 +63,13 @@ export function createReservation(guildId, { room, date, purpose, userId, userNa
   return updateReservations(guildId, (list) => {
     const conflict = list.find((r) => r.room === room && r.date === date && r.status === 'approved');
     if (conflict) return { ok: false, conflict };
+    const requestedParticipants = participants?.length ? participants : [{ userId, name: requesterDisplayName }];
+    const requestedUserIds = new Set(requestedParticipants.map((participant) => participant.userId));
+    for (const reservation of list) {
+      if (reservation.date !== date || !isActive(reservation)) continue;
+      const participant = participantsOf(reservation).find((item) => requestedUserIds.has(item.userId));
+      if (participant) return { ok: false, participantConflict: { participant, reservation } };
+    }
     const reservation = {
       id: randomUUID(),
       guildId,
@@ -100,7 +107,7 @@ export function requestEmbed(reservation) {
     .addFields(
       { name: '회의실', value: reservation.room, inline: true },
       { name: '날짜', value: reservation.date, inline: true },
-      { name: '신청자', value: `<@${reservation.userId}>`, inline: true },
+      { name: '신청자', value: reservation.requesterDisplayName, inline: true },
       { name: `회의 인원 (${participants.length}명)`, value: participantList(reservation) },
       { name: '목적', value: reservation.purpose },
     )
@@ -219,17 +226,44 @@ async function finishReservationDecision(interaction, decision) {
   const notice = decision.withdrawn
     ? `<@${reservation.userId}> 회의실 신청을 취소했습니다.`
     : reservation.status === 'approved'
-    ? `<@${reservation.userId}> 회의실 사용 신청이 승인되었습니다.\n처리: <@${reservation.decidedBy}>`
-    : `<@${reservation.userId}> 회의실 사용 신청이 거절되었습니다.\n사유: ${reservation.rejectionReason}\n처리: <@${reservation.decidedBy}>`;
-  await sendDecisionNotice(interaction.client, reservation.discussionThreadId ?? reservation.requestChannelId, notice, reservation.userId);
+    ? `회의실 사용 신청이 승인되었습니다.\n처리: <@${reservation.decidedBy}>`
+    : `회의실 사용 신청이 거절되었습니다.\n사유: ${reservation.rejectionReason}\n처리: <@${reservation.decidedBy}>`;
+  await sendDecisionNotice(interaction.client, reservation.discussionThreadId ?? reservation.requestChannelId, notice);
+  if (!decision.withdrawn) {
+    const dmNotice = reservation.status === 'approved'
+      ? `회의실 사용 신청이 승인되었습니다.\n처리: ${reservation.decidedByName}`
+      : `회의실 사용 신청이 거절되었습니다.\n사유: ${reservation.rejectionReason}\n처리: ${reservation.decidedByName}`;
+    const participantIds = participantsOf(reservation).map((participant) => participant.userId);
+    if (reservation.userId !== reservation.decidedBy) {
+      await notifyAndReleasePrivateThreadMembers(interaction.client, reservation.discussionThreadId, [reservation.userId], dmNotice);
+    }
+    await releasePrivateThreadMembers(
+      interaction.client,
+      reservation.discussionThreadId,
+      participantIds.filter((userId) => userId !== reservation.userId && userId !== reservation.decidedBy),
+    );
+  }
   for (const rejected of decision.autoRejected ?? []) {
     await addPrivateThreadMember(interaction.client, rejected.discussionThreadId, interaction.user.id);
     await updateReservationRequestMessage(interaction.client, rejected);
     await sendDecisionNotice(
       interaction.client,
       rejected.discussionThreadId ?? rejected.requestChannelId,
-      `<@${rejected.userId}> 회의실 사용 신청이 자동으로 거절되었습니다.\n사유: ${rejected.rejectionReason}\n처리: <@${rejected.decidedBy}>`,
-      rejected.userId,
+      `회의실 사용 신청이 거절되었습니다.\n사유: ${rejected.rejectionReason}\n처리: <@${rejected.decidedBy}>`,
+    );
+    const participantIds = participantsOf(rejected).map((participant) => participant.userId);
+    if (rejected.userId !== rejected.decidedBy) {
+      await notifyAndReleasePrivateThreadMembers(
+        interaction.client,
+        rejected.discussionThreadId,
+        [rejected.userId],
+        `회의실 사용 신청이 거절되었습니다.\n사유: ${rejected.rejectionReason}\n처리: ${rejected.decidedByName}`,
+      );
+    }
+    await releasePrivateThreadMembers(
+      interaction.client,
+      rejected.discussionThreadId,
+      participantIds.filter((userId) => userId !== rejected.userId && userId !== rejected.decidedBy),
     );
   }
   await refreshAllStatusBoards(interaction.client).catch((err) => log('error', '현황판 갱신 실패:', err.message));

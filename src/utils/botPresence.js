@@ -49,6 +49,7 @@ const TRACKS = [
   'Simulcaster - SV-side - Yoshida Yasei feat. Kasane Teto',
   'キャラクターT - Atena feat. Kasane Teto',
   '性格悪くてすみません。 - Aoya feat. Kasane Teto',
+  'BABEL - Iyowa feat. Kasane Teto',
 ];
 
 export function startBotPresence(client) {

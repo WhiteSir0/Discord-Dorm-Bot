@@ -14,6 +14,13 @@ export function currentWeekStartKst() {
   return date.toISOString().slice(0, 10);
 }
 
+export function isCurrentWeekKst(dateStr) {
+  const start = currentWeekStartKst();
+  const end = new Date(`${start}T00:00:00Z`);
+  end.setUTCDate(end.getUTCDate() + 6);
+  return dateStr >= start && dateStr <= end.toISOString().slice(0, 10);
+}
+
 export function dayOfWeek(dateStr) {
   return new Date(`${dateStr}T00:00:00Z`).getUTCDay();
 }

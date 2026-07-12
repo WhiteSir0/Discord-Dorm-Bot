@@ -10,6 +10,7 @@ process.chdir(workDir);
 const extension = await import('../src/utils/extensionApplication.js');
 const stay = await import('../src/utils/stayApplication.js');
 const timers = await import('../src/utils/applicationTimers.js');
+const dates = await import('../src/utils/dateKst.js');
 
 test.after(async () => {
   process.chdir(originalCwd);
@@ -69,4 +70,17 @@ test('잔류 결과 CSV는 학번 이름 호실만 식별 정보로 포함한다
   assert.match(csv, /학번,이름,호실,신청 시각/);
   assert.match(csv, /70707,홍길동,707/);
   assert.doesNotMatch(csv, /discord-id/);
+});
+
+test('회의실 신청 날짜는 이번 주 일요일부터 토요일까지만 허용한다', () => {
+  const start = dates.currentWeekStartKst();
+  const sunday = new Date(`${start}T00:00:00Z`);
+  const saturday = new Date(sunday);
+  saturday.setUTCDate(saturday.getUTCDate() + 6);
+  const nextSunday = new Date(sunday);
+  nextSunday.setUTCDate(nextSunday.getUTCDate() + 7);
+
+  assert.equal(dates.isCurrentWeekKst(start), true);
+  assert.equal(dates.isCurrentWeekKst(saturday.toISOString().slice(0, 10)), true);
+  assert.equal(dates.isCurrentWeekKst(nextSunday.toISOString().slice(0, 10)), false);
 });

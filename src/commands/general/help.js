@@ -1,9 +1,9 @@
 import { SlashCommandBuilder, EmbedBuilder, InteractionContextType, MessageFlags } from 'discord.js';
 import { config } from '../../config.js';
 
-function canUseCommand(command, permissions) {
+function isPublicCommand(command) {
   const required = command.data.toJSON().default_member_permissions;
-  return !required || permissions?.has(BigInt(required));
+  return !required;
 }
 
 function commandLines(command) {
@@ -15,9 +15,9 @@ function commandLines(command) {
   return [`**/${data.name}** — ${data.description}`];
 }
 
-function buildHelpEmbed(client, permissions) {
+function buildHelpEmbed(client) {
   const lines = [...client.commands.values()]
-    .filter((command) => canUseCommand(command, permissions))
+    .filter(isPublicCommand)
     .flatMap((cmd) => {
       const prefixPart = config.prefix && typeof cmd.executePrefix === 'function' && cmd.aliases?.length
         ? ` (커맨드: ${cmd.aliases.map((a) => `\`${config.prefix}${a}\``).join(' ')})`
@@ -41,10 +41,10 @@ export default {
   aliases: ['help', '도움', '도움말'],
 
   async execute(interaction) {
-    await interaction.reply({ embeds: [buildHelpEmbed(interaction.client, interaction.memberPermissions)], flags: MessageFlags.Ephemeral });
+    await interaction.reply({ embeds: [buildHelpEmbed(interaction.client)], flags: MessageFlags.Ephemeral });
   },
 
   async executePrefix(message) {
-    await message.reply({ embeds: [buildHelpEmbed(message.client, message.member?.permissions)] });
+    await message.reply({ embeds: [buildHelpEmbed(message.client)] });
   },
 };

@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, PermissionFlagsBits, MessageFlags, InteractionContextType } from 'discord.js';
 import { updateSettings, refreshStatusBoard } from '../../utils/meetingRoom.js';
+import { sendChannelGuide } from '../../utils/channelGuide.js';
 import { log } from '../../utils/logger.js';
 
 export default {
@@ -60,6 +61,15 @@ export default {
         await refreshStatusBoard(interaction.client, interaction.guildId);
       } catch (err) {
         log('error', '현황판 갱신 실패:', err.message);
+      }
+    }
+
+    if (!previous.unchanged) {
+      try {
+        await sendChannelGuide(interaction.channel, type);
+      } catch (err) {
+        log('error', '채널 안내 전송 실패:', err.message);
+        await interaction.followUp({ content: '채널은 설정됐지만 안내 메시지를 보내지 못했어요. 봇의 메시지 전송 권한을 확인해주세요.', flags: MessageFlags.Ephemeral });
       }
     }
   },

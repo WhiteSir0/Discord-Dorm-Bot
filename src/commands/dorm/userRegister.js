@@ -7,13 +7,13 @@ export default {
     .setDescription('학번, 이름, 기숙사 호실을 등록합니다.')
     .setContexts(InteractionContextType.Guild)
     .addStringOption((opt) =>
-      opt.setName('학번').setDescription('학번 5자리 (예: 10101)').setRequired(true).setMinLength(5).setMaxLength(5),
+      opt.setName('학번').setDescription('학번 5자리 (예: 70707)').setRequired(true).setMinLength(5).setMaxLength(5),
     )
     .addStringOption((opt) =>
       opt.setName('이름').setDescription('실명 (예: 홍길동)').setRequired(true).setMinLength(2).setMaxLength(5),
     )
     .addStringOption((opt) =>
-      opt.setName('호실').setDescription('기숙사 호실 3자리 (예: 306)').setRequired(true).setMinLength(3).setMaxLength(3),
+      opt.setName('호실').setDescription('기숙사 호실 3자리 (예: 707)').setRequired(true).setMinLength(3).setMaxLength(3),
     ),
 
   async execute(interaction) {
@@ -22,7 +22,7 @@ export default {
     const room = interaction.options.getString('호실').trim();
 
     if (!STUDENT_ID_RE.test(studentId)) {
-      await interaction.reply({ content: '학번은 숫자 5자리로 입력해주세요. (예: `10101`)', flags: MessageFlags.Ephemeral });
+      await interaction.reply({ content: '학번은 숫자 5자리로 입력해주세요. (예: `70707`)', flags: MessageFlags.Ephemeral });
       return;
     }
     if (!NAME_RE.test(name)) {
@@ -30,7 +30,7 @@ export default {
       return;
     }
     if (!ROOM_RE.test(room)) {
-      await interaction.reply({ content: '호실은 숫자 3자리로 입력해주세요. (예: `306`)', flags: MessageFlags.Ephemeral });
+      await interaction.reply({ content: '호실은 숫자 3자리로 입력해주세요. (예: `707`)', flags: MessageFlags.Ephemeral });
       return;
     }
 

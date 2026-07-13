@@ -3,7 +3,7 @@ import { createPrivateApplicationThread } from './privateApplicationThread.js';
 
 export async function createApplicationPost(client, guildId, type, payload) {
   const settings = await getSettings(guildId);
-  const channelId = settings.channels?.[type]?.channelId ?? payload.fallbackChannelId;
+  const channelId = settings.channels?.[type]?.channelId;
   if (!channelId) return null;
 
   const channel = await client.channels.fetch(channelId).catch(() => null);

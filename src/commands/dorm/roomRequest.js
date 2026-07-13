@@ -94,6 +94,15 @@ export async function handleRoomParticipantSelect(interaction) {
 
 export async function handleRoomParticipantConfirm(interaction) {
   const id = interaction.customId.split(':')[2];
+  const settings = await getSettings(interaction.guildId);
+  const channelId = settings.channels?.['회의실신청']?.channelId;
+  if (!channelId || interaction.channelId !== channelId) {
+    const content = channelId
+      ? `신청 채널이 바뀌었어요. <#${channelId}>에서 다시 신청해주세요.`
+      : '회의실 신청 채널 설정이 없어졌어요. 관리자에게 문의해주세요.';
+    await interaction.update({ content, components: [] });
+    return;
+  }
   const draft = await takeDraft(id, interaction.guildId, interaction.user.id);
   if (!draft) {
     await interaction.update({ content: '신청 시간이 만료됐어요. `/회의실신청`을 다시 실행해주세요.', components: [] });
@@ -141,7 +150,6 @@ export async function handleRoomParticipantConfirm(interaction) {
       components: [row],
       applicantUserId: result.reservation.userId,
       memberUserIds: participants.map((participant) => participant.userId),
-      fallbackChannelId: interaction.channelId,
     }).catch((err) => {
       log('error', '회의실 신청 스레드 생성 실패:', err.message);
       return null;

@@ -1,4 +1,4 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType } from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits } from 'discord.js';
 
 export function privateThreadLinkRow(guildId, threadId) {
   return new ActionRowBuilder().addComponents(
@@ -19,7 +19,13 @@ export async function createPrivateApplicationThread(channel, guildId, payload) 
     autoArchiveDuration: 10_080,
     invitable: false,
   });
-  const memberUserIds = [...new Set(payload.memberUserIds ?? [payload.applicantUserId])];
+  const staffUserIds = [...(channel.members?.values?.() ?? [])]
+    .filter((member) => !member.user?.bot && (
+      member.permissionsIn(channel).has(PermissionFlagsBits.Administrator)
+      || member.permissionsIn(channel).has(PermissionFlagsBits.ManageThreads)
+    ))
+    .map((member) => member.id);
+  const memberUserIds = [...new Set([...(payload.memberUserIds ?? [payload.applicantUserId]), ...staffUserIds])];
   for (const userId of memberUserIds) await thread.members.add(userId);
   await thread.send({
     content: `<@${payload.applicantUserId}> 신청 관련 대화 스레드입니다.`,

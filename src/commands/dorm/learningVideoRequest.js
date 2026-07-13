@@ -55,6 +55,15 @@ export default {
 
 export async function handleLearningVideoModal(interaction) {
   const id = interaction.customId.split(':')[2];
+  const settings = await getSettings(interaction.guildId);
+  const channelId = settings.channels?.['학습영상신청']?.channelId;
+  if (!channelId || interaction.channelId !== channelId) {
+    const content = channelId
+      ? `신청 채널이 바뀌었어요. <#${channelId}>에서 다시 신청해주세요.`
+      : '학습 영상 신청 채널 설정이 없어졌어요. 관리자에게 문의해주세요.';
+    await interaction.reply({ content, flags: MessageFlags.Ephemeral });
+    return;
+  }
   const draft = await takeDraft(id, interaction.guildId, interaction.user.id);
   if (!draft) {
     await interaction.reply({ content: '신청 시간이 만료됐어요. `/학습영상신청`을 다시 실행해주세요.', flags: MessageFlags.Ephemeral });
@@ -83,7 +92,6 @@ export async function handleLearningVideoModal(interaction) {
     embeds: [embed],
     components: [row],
     applicantUserId: request.userId,
-    fallbackChannelId: interaction.channelId,
     parentMessage,
     previewEmbeds,
   });

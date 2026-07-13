@@ -41,6 +41,14 @@ export function scheduleStayClose(client, guildId, application) {
   schedule('잔류 신청', client, guildId, application, closeStayApplication, stayEmbed, (item) => [stayButtons(item)]);
 }
 
+export function clearGuildTimers(guildId) {
+  for (const [key, timer] of timers) {
+    if (!key.endsWith(`:${guildId}`)) continue;
+    clearTimeout(timer);
+    timers.delete(key);
+  }
+}
+
 export async function restoreApplicationTimers(client) {
   for (const guild of client.guilds.cache.values()) {
     const extension = await getActiveExtensionApplication(guild.id);

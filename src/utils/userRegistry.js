@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { readJson, updateJson } from './jsonStore.js';
 
 const usersPath = (guildId) => join('guilds', guildId, 'users.json');
+const requesterNamesPath = (guildId) => join('requester-names', `${guildId}.json`);
 
 export async function getUserInfo(guildId, userId) {
   const users = await readJson(usersPath(guildId), {});
@@ -27,9 +28,12 @@ export async function resolveRegisteredUsers(guildId, input) {
   return { ok: true, users: resolved };
 }
 
-export function setUserInfo(guildId, userId, { studentId, name, room }) {
-  return updateJson(usersPath(guildId), {}, (users) => {
+export async function setUserInfo(guildId, userId, { studentId, name, room }) {
+  await updateJson(usersPath(guildId), {}, (users) => {
     users[userId] = { studentId, name, room, updatedAt: new Date().toISOString() };
+  });
+  await updateJson(requesterNamesPath(guildId), {}, (names) => {
+    names[userId] = name;
   });
 }
 

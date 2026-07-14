@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, PermissionFlagsBits, MessageFlags, InteractionContextType } from 'discord.js';
-import { cancelReservation, refreshAllStatusBoards, ROOM_NAMES, updateReservationRequestMessage } from '../../utils/meetingRoom.js';
+import { cancelReservation, getSettings, refreshAllStatusBoards, ROOM_NAMES, updateReservationRequestMessage } from '../../utils/meetingRoom.js';
 import { isValidDateString, normalizeDateInput } from '../../utils/dateKst.js';
 import { log } from '../../utils/logger.js';
 import { sendDecisionNotice } from '../../utils/applicationForum.js';
@@ -28,6 +28,16 @@ export default {
   async execute(interaction) {
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
       await interaction.reply({ content: '자치회 인원이 아닙니다.', flags: MessageFlags.Ephemeral });
+      return;
+    }
+    const settings = await getSettings(interaction.guildId);
+    const channelId = settings.channels?.['회의실신청']?.channelId;
+    if (!channelId) {
+      await interaction.reply({ content: '회의실 신청 채널이 설정되지 않았어요.', flags: MessageFlags.Ephemeral });
+      return;
+    }
+    if (interaction.channelId !== channelId) {
+      await interaction.reply({ content: `이 명령어는 <#${channelId}>에서만 사용할 수 있어요.`, flags: MessageFlags.Ephemeral });
       return;
     }
     const room = interaction.options.getString('회의실');

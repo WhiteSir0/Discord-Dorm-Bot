@@ -2,12 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
 import { ChannelType, PermissionFlagsBits } from 'discord.js';
-import { cancelReservation, createReservation, decideReservation, getReservations, requestEmbed, withdrawReservation } from '../src/utils/meetingRoom.js';
+import { cancelReservation, createReservation, decideReservation, getReservations, requestEmbed, updateSettings, withdrawReservation } from '../src/utils/meetingRoom.js';
 import { createVideoRequest, getVideoRequests, videoRequestEmbed, withdrawVideoRequest } from '../src/utils/learningVideo.js';
 import { sendChannelGuide } from '../src/utils/channelGuide.js';
 import { createPrivateApplicationThread, notifyAndReleasePrivateThreadMembers, releasePrivateThreadMembers } from '../src/utils/privateApplicationThread.js';
 import { createApplicationPost } from '../src/utils/applicationForum.js';
 import { createRoomRequestThread } from '../src/utils/roomRequestThread.js';
+import roomCancelCommand from '../src/commands/dorm/roomCancel.js';
 
 const interaction = (userId = 'admin') => ({
   guildId: 'guild-a',
@@ -178,6 +179,21 @@ test('회의실 비공개 스레드에는 신청자와 추가 인원 및 관리�
   });
 
   assert.deepEqual(added, ['applicant', 'participant', 'admin']);
+});
+
+test('관리자 회의실 취소는 설정된 신청 채널에서만 실행한다', async () => {
+  await updateSettings('guild-a', (settings) => {
+    settings.channels = { 회의실신청: { channelId: 'request-channel' } };
+  });
+  const replies = [];
+  await roomCancelCommand.execute({
+    guildId: 'guild-a', channelId: 'other-channel',
+    memberPermissions: { has: () => true },
+    options: { getString: () => assert.fail('options should not be read') },
+    reply: async (payload) => replies.push(payload),
+  });
+
+  assert.match(replies[0].content, /<#request-channel>/);
 });
 
 test('설정된 신청 채널이 없으면 현재 채널로 대신 게시하지 않는다', async () => {

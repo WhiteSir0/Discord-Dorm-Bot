@@ -23,7 +23,7 @@ export function attachVideoRequestMessage(guildId, id, channelId, messageId, dis
 }
 
 function referenceParts(request) {
-  const reference = request.reference ?? request.url;
+  const reference = request.reference ?? request.url ?? '';
   const links = [];
   const descriptions = [];
   for (const item of reference.split(/[,\n]+/).map((value) => value.trim()).filter(Boolean)) {
@@ -90,13 +90,15 @@ export async function videoPreviewEmbeds(links) {
 
 export function videoRequestEmbed(request) {
   const { links, descriptions } = referenceParts(request);
+  const description = request.description ?? request.purpose ?? descriptions.join('\n');
   const embed = new EmbedBuilder()
     .setTitle('학습 영상 신청')
     .setColor(0xf0b232)
     .addFields(
       { name: '신청자', value: request.requesterDisplayName, inline: true },
+      ...(request.floor ? [{ name: '학습할 층', value: request.floor, inline: true }] : []),
       { name: '학습 시간', value: request.duration, inline: true },
-      { name: '학습 목적', value: request.purpose, inline: true },
+      { name: '설명', value: description || '없음' },
     )
     .setFooter({ text: `승인 대기 중 · ${request.id}` });
   if (links.length) {
@@ -105,12 +107,6 @@ export function videoRequestEmbed(request) {
       value: links.map((link, index) => `[링크 ${index + 1} 열기](${link})`).join('\n').slice(0, 1024),
     });
     embed.setURL(links[0]);
-  }
-  if (descriptions.length) {
-    embed.addFields({
-      name: '설명',
-      value: descriptions.map((description) => `• ${description}`).join('\n').slice(0, 1024),
-    });
   }
   return embed;
 }

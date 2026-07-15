@@ -43,13 +43,19 @@ export default {
       return;
     }
     const id = await createDraft({ guildId: interaction.guildId, userId: interaction.user.id, userName: formatUser(info), requesterDisplayName: serverDisplayName(interaction) });
-    const reference = new TextInputBuilder().setCustomId('reference').setLabel('링크 또는 설명').setPlaceholder('여러 개면 쉼표 또는 줄바꿈으로 구분').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1000);
-    const purpose = new TextInputBuilder().setCustomId('purpose').setLabel('학습 목적').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(500);
+    const floor = new TextInputBuilder().setCustomId('floor').setLabel('학습할 층').setPlaceholder('예: 3층').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(20);
+    const description = new TextInputBuilder().setCustomId('description').setLabel('설명').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1000);
+    const reference = new TextInputBuilder().setCustomId('reference').setLabel('링크 (선택)').setPlaceholder('영상이 여러 개면 줄바꿈으로 구분').setStyle(TextInputStyle.Paragraph).setRequired(false).setMaxLength(2000);
     const duration = new TextInputBuilder().setCustomId('duration').setLabel('학습 시간').setPlaceholder('예: 약 20분').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(60);
     await interaction.showModal(new ModalBuilder()
       .setCustomId(`lv:submit:${id}`)
       .setTitle('학습 영상 신청')
-      .addComponents(new ActionRowBuilder().addComponents(reference), new ActionRowBuilder().addComponents(purpose), new ActionRowBuilder().addComponents(duration)));
+      .addComponents(
+        new ActionRowBuilder().addComponents(floor),
+        new ActionRowBuilder().addComponents(description),
+        new ActionRowBuilder().addComponents(reference),
+        new ActionRowBuilder().addComponents(duration),
+      ));
   },
 };
 
@@ -73,8 +79,9 @@ export async function handleLearningVideoModal(interaction) {
     userId: interaction.user.id,
     userName: draft.userName,
     requesterDisplayName: draft.requesterDisplayName,
+    floor: interaction.fields.getTextInputValue('floor').trim(),
+    description: interaction.fields.getTextInputValue('description').trim(),
     reference: interaction.fields.getTextInputValue('reference').trim(),
-    purpose: interaction.fields.getTextInputValue('purpose').trim(),
     duration: interaction.fields.getTextInputValue('duration').trim(),
   });
   const row = new ActionRowBuilder().addComponents(
